@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CineMatch — Your AI Movie Companion</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cyan: { DEFAULT: '#00f2fe', 400: '#00f2fe', 500: '#00d4e0' },
+            purple: { accent: '#a855f7', deep: '#7c3aed' },
+            dark: { 900: '#000000', 800: '#0a0a0f', 700: '#0f0f1a', 600: '#111827', 500: '#1a1f2e', 400: '#1e2435', 300: '#252b3d' },
+          },
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          backdropBlur: { xs: '2px', sm: '8px', md: '16px', lg: '24px', xl: '40px' },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --cyan: #00f2fe;
+      --cyan-dim: rgba(0, 242, 254, 0.15);
+      --cyan-glow: rgba(0, 242, 254, 0.4);
+      --purple: #a855f7;
+      --purple-dim: rgba(168, 85, 247, 0.15);
+      --purple-glow: rgba(168, 85, 247, 0.4);
+      --bg-0: #000000;
+      --bg-1: #0a0a0f;
+      --bg-2: #0f0f1a;
+      --bg-3: #111827;
+      --bg-4: #1a1f2e;
+      --bg-5: #252b3d;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #4b5563;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg-0);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    /* ─── SCROLLBAR ─── */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: var(--bg-1); }
+    ::-webkit-scrollbar-thumb { background: var(--bg-5); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--cyan); }
+
+    /* ─── NAVBAR ─── */
+    #navbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(0, 242, 254, 0.08);
+      transition: background 0.3s ease;
+    }
+    #navbar.scrolled {
+      background: rgba(0, 0, 0, 0.92);
+      border-bottom-color: rgba(0, 242, 254, 0.15);
+    }
+
+    .nav-logo span:first-child { color: var(--cyan); }
+    .nav-logo span:last-child { color: var(--text-primary); }
+
+    .search-bar {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      transition: all 0.3s ease;
+    }
+    .search-bar:focus-within {
+      background: rgba(0, 242, 254, 0.08);
+      border-color: rgba(0, 242, 254, 0.5);
+      box-shadow: 0 0 0 3px rgba(0, 242, 254, 0.1);
+    }
+    .search-bar input { background: transparent; outline: none; }
+
+    .ai-btn {
+      background: linear-gradient(135deg, rgba(0,242,254,0.15), rgba(168,85,247,0.15));
+      border: 1px solid rgba(0,242,254,0.3);
+      border-radius: 8px;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .ai-btn::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(0,242,254,0.2), rgba(168,85,247,0.2));
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .ai-btn:hover::before { opacity: 1; }
+    .ai-btn:hover { border-color: rgba(0,242,254,0.6); box-shadow: 0 0 16px rgba(0,242,254,0.2); }
+
+    /* ─── HERO ─── */
+    #hero {
+      position: relative;
+      height: 92vh;
+      min-height: 600px;
+      overflow: hidden;
+    }
+    .hero-bg {
+      position: absolute; inset: 0;
+      background-image: url('https://images.unsplash.com/photo-1534809027769-b00d750a6bac?w=1800&q=85');
+      background-size: cover;
+      background-position: center top;
+      transform: scale(1.05);
+      animation: heroZoom 20s ease-in-out infinite alternate;
+    }
+    @keyframes heroZoom {
+      from { transform: scale(1.05); }
+      to   { transform: scale(1.12); }
+    }
+    .hero-gradient {
+      position: absolute; inset: 0;
+      background: linear-gradient(
+        to bottom,
+        rgba(0,0,0,0.2) 0%,
+        rgba(0,0,0,0.1) 30%,
+        rgba(0,0,0,0.6) 65%,
+        rgba(0,0,0,0.95) 85%,
+        #000 100%
+      );
+    }
+    .hero-gradient-left {
+      position: absolute; inset: 0;
+      background: linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 50%, transparent 100%);
+    }
+
+    .match-badge {
+      background: linear-gradient(135deg, rgba(0,242,254,0.25), rgba(0,242,254,0.1));
+      border: 1px solid rgba(0,242,254,0.5);
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--cyan);
+      letter-spacing: 0.05em;
+      padding: 4px 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      animation: pulseBadge 2.5s ease-in-out infinite;
+    }
+    @keyframes pulseBadge {
+      0%,100% { box-shadow: 0 0 8px rgba(0,242,254,0.3); }
+      50%      { box-shadow: 0 0 20px rgba(0,242,254,0.6); }
+    }
+
+    .why-pill {
+      background: rgba(168,85,247,0.15);
+      border: 1px solid rgba(168,85,247,0.4);
+      border-radius: 20px;
+      font-size: 12px;
+      color: #c084fc;
+      padding: 5px 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-play {
+      background: var(--cyan);
+      color: #000;
+      font-weight: 700;
+      font-size: 14px;
+      border-radius: 8px;
+      padding: 12px 28px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+      letter-spacing: 0.02em;
+    }
+    .btn-play:hover {
+      background: #33f5ff;
+      box-shadow: 0 0 24px rgba(0,242,254,0.6);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: var(--text-primary);
+      font-weight: 600;
+      font-size: 14px;
+      border-radius: 8px;
+      padding: 12px 24px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+    }
+    .btn-outline:hover {
+      background: rgba(255,255,255,0.15);
+      border-color: rgba(255,255,255,0.4);
+      transform: translateY(-1px);
+    }
+
+    /* ─── CONTROL CENTER ─── */
+    #control-center {
+      background: linear-gradient(135deg, rgba(0,242,254,0.04), rgba(168,85,247,0.04));
+      border: 1px solid rgba(0,242,254,0.12);
+      border-radius: 16px;
+      padding: 28px 32px;
+      position: relative;
+      overflow: hidden;
+    }
+    #control-center::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0,242,254,0.4), rgba(168,85,247,0.4), transparent);
+    }
+
+    .control-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    /* Toggle Pills */
+    .pill-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      padding: 7px 16px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .pill:hover {
+      background: rgba(0,242,254,0.08);
+      border-color: rgba(0,242,254,0.3);
+      color: var(--cyan);
+    }
+    .pill.active {
+      background: rgba(0,242,254,0.15);
+      border-color: rgba(0,242,254,0.6);
+      color: var(--cyan);
+      font-weight: 600;
+      box-shadow: 0 0 10px rgba(0,242,254,0.2);
+    }
+    .pill.active-purple {
+      background: rgba(168,85,247,0.15);
+      border-color: rgba(168,85,247,0.6);
+      color: #c084fc;
+      font-weight: 600;
+      box-shadow: 0 0 10px rgba(168,85,247,0.2);
+    }
+
+    /* Range Slider */
+    .slider-track { position: relative; margin-top: 4px; }
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      background: var(--cyan);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(0,242,254,0.5);
+      transition: box-shadow 0.2s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 16px rgba(0,242,254,0.8);
+    }
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    /* ─── MOVIE ROWS ─── */
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-subtitle {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 3px;
+    }
+    .section-tag {
+      background: rgba(0,242,254,0.1);
+      border: 1px solid rgba(0,242,254,0.25);
+      color: var(--cyan);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 4px;
+    }
+
+    .row-wrapper { position: relative; }
+    .row-scroll {
+      display: flex;
+      gap: 14px;
+      overflow-x: auto;
+      padding: 8px 4px 16px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      scroll-behavior: smooth;
+    }
+    .row-scroll::-webkit-scrollbar { display: none; }
+
+    .scroll-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 10;
+      width: 44px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border-radius: 8px;
+      background: rgba(0,0,0,0.8);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-primary);
+      font-size: 16px;
+      transition: all 0.25s ease;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .row-wrapper:hover .scroll-btn { opacity: 1; pointer-events: all; }
+    .scroll-btn:hover {
+      background: rgba(0,242,254,0.15);
+      border-color: rgba(0,242,254,0.4);
+      color: var(--cyan);
+      box-shadow: 0 0 16px rgba(0,242,254,0.2);
+    }
+    .scroll-btn.left { left: -20px; }
+    .scroll-btn.right { right: -20px; }
+
+    /* ─── MOVIE CARD ─── */
+    .movie-card {
+      flex: 0 0 160px;
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  box-shadow 0.35s ease;
+      background: var(--bg-4);
+    }
+    .movie-card:hover {
+      transform: scale(1.08) translateY(-4px);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,242,254,0.3);
+      z-index: 5;
+    }
+    .movie-card img {
+      width: 100%;
+      height: 230px;
+      object-fit: cover;
+      display: block;
+    }
+    .card-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.3) 50%, transparent 100%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 12px 10px;
+      gap: 6px;
+    }
+    .movie-card:hover .card-overlay { opacity: 1; }
+
+    .card-match {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--cyan);
+      background: rgba(0,0,0,0.75);
+      border: 1px solid rgba(0,242,254,0.4);
+      border-radius: 4px;
+      padding: 2px 7px;
+      letter-spacing: 0.03em;
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: white;
+      line-height: 1.3;
+    }
+    .card-meta {
+      font-size: 10px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-genres {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .genre-tag {
+      font-size: 9px;
+      background: rgba(168,85,247,0.25);
+      border: 1px solid rgba(168,85,247,0.3);
+      color: #c084fc;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    .card-play-icon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.5);
+      width: 42px;
+      height: 42px;
+      background: rgba(0,242,254,0.9);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #000;
+      font-size: 14px;
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+    .movie-card:hover .card-play-icon {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* ─── MODAL ─── */
+    #modal-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    #modal-overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+    #modal {
+      background: var(--bg-2);
+      border: 1px solid rgba(0,242,254,0.15);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 860px;
+      max-height: 90vh;
+      overflow-y: auto;
+      transform: scale(0.9) translateY(20px);
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      scrollbar-width: thin;
+    }
+    #modal-overlay.active #modal {
+      transform: scale(1) translateY(0);
+    }
+
+    .modal-hero {
+      position: relative;
+      height: 340px;
+      overflow: hidden;
+      border-radius: 16px 16px 0 0;
+    }
+    .modal-hero img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .modal-hero-gradient {
+      position: absolute; inset: 0;
+      background: linear-gradient(to bottom, transparent 30%, var(--bg-2) 100%);
+    }
+    .modal-hero-left {
+      position: absolute; inset: 0;
+      background: linear-gradient(to right, rgba(0,0,0,0.6) 0%, transparent 60%);
+    }
+    .modal-hero-content {
+      position: absolute;
+      bottom: 24px;
+      left: 28px;
+      right: 28px;
+    }
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 36px;
+      height: 36px;
+      background: rgba(0,0,0,0.7);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: white;
+      font-size: 14px;
+      transition: all 0.2s;
+      z-index: 10;
+    }
+    .modal-close:hover {
+      background: rgba(0,242,254,0.2);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    .rating-star { color: #fbbf24; }
+
+    .platform-badge {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      padding: 4px 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .dont-show-btn {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #f87171;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .dont-show-btn:hover {
+      background: rgba(239,68,68,0.2);
+      border-color: rgba(239,68,68,0.6);
+    }
+
+    .cast-avatar {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid rgba(0,242,254,0.2);
+    }
+
+    /* ─── SIMILAR ROW IN MODAL ─── */
+    .mini-card {
+      flex: 0 0 110px;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .mini-card:hover {
+      transform: scale(1.06);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,242,254,0.3);
+    }
+    .mini-card img {
+      width: 100%;
+      height: 155px;
+      object-fit: cover;
+    }
+    .mini-card-title {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      padding: 6px 6px 4px;
+      background: var(--bg-4);
+    }
+
+    /* ─── FOOTER ─── */
+    footer {
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* ─── ANIMATIONS ─── */
+    .fade-in {
+      animation: fadeIn 0.6s ease forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .section-fade {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .section-fade.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 768px) {
+      .movie-card { flex: 0 0 130px; }
+      .movie-card img { height: 185px; }
+      .section-title { font-size: 16px; }
+      #hero { height: 70vh; min-height: 480px; }
+      .modal-hero { height: 220px; }
+      #control-center { padding: 20px; }
+    }
+    @media (max-width: 480px) {
+      .movie-card { flex: 0 0 110px; }
+      .movie-card img { height: 158px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  NAVBAR                                    -->
+<!-- ══════════════════════════════════════════ -->
+<nav id="navbar" class="px-6 py-4">
+  <div class="max-w-screen-2xl mx-auto flex items-center gap-6">
+
+    <!-- Logo -->
+    <a href="#" class="nav-logo flex items-center gap-1 flex-shrink-0">
+      <i class="fa-solid fa-film text-cyan-400 text-xl"></i>
+      <span class="font-black text-xl tracking-tight text-cyan-400">Cine</span>
+      <span class="font-black text-xl tracking-tight">Match</span>
+    </a>
+
+    <!-- Nav Links (desktop) -->
+    <div class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-400">
+      <a href="#" class="text-white hover:text-cyan-400 transition-colors">Home</a>
+      <a href="#" class="hover:text-cyan-400 transition-colors">Discover</a>
+      <a href="#" class="hover:text-cyan-400 transition-colors">Watchlist</a>
+      <a href="#" class="hover:text-cyan-400 transition-colors">Trending</a>
+    </div>
+
+    <!-- Search -->
+    <div class="search-bar flex items-center gap-2 px-3 py-2 flex-1 max-w-sm ml-auto">
+      <i class="fa-solid fa-magnifying-glass text-gray-500 text-sm flex-shrink-0"></i>
+      <input
+        type="text"
+        placeholder="Search movies, actors, genres..."
+        class="text-sm text-gray-300 placeholder-gray-600 w-full"
+      />
+    </div>
+
+    <!-- AI Assistant Button -->
+    <button class="ai-btn hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-semibold text-cyan-300 flex-shrink-0"
+      onclick="openModal(movies[0])">
+      <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+      <span>AI Assistant</span>
+    </button>
+
+    <!-- Profile -->
+    <div class="flex-shrink-0 w-9 h-9 rounded-full overflow-hidden border-2 border-cyan-400/30 cursor-pointer hover:border-cyan-400/70 transition-colors">
+      <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&q=80" alt="Profile" class="w-full h-full object-cover" />
+    </div>
+
+  </div>
+</nav>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!--  HERO SECTION                              -->
+<!-- ══════════════════════════════════════════ -->
+<section id="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-gradient"></div>
+  <div class="hero-gradient-left"></div>
+
+  <!-- Content -->
+  <div class="absolute inset-0 flex items-end pb-16 px-8 md:px-16">
+    <div class="max-w-xl fade-in">
+
+      <!-- Match Badge -->
+      <div class="match-badge mb-4">
+        <i class="fa-solid fa-circle-check text-xs"></i>
+        98% Match For You
+      </div>
+
+      <!-- Title -->
+      <h1 class="text-5xl md:text-7xl font-black tracking-tight text-white leading-none mb-3">
+        Dune
+      </h1>
+      <p class="text-lg font-light text-gray-200 mb-2">Part Two — 2024</p>
+
+      <!-- Synopsis -->
+      <p class="text-gray-300 text-sm leading-relaxed mb-5 max-w-md">
+        Paul Atreides unites with Chani and the Fremen while seeking revenge against the conspirators who destroyed his family. Facing a choice between the love of his life and the fate of the known universe.
+      </p>
+
+      <!-- Why Pill -->
+      <div class="why-pill mb-6">
+        <i class="fa-solid fa-brain text-xs text-purple-400"></i>
+        Recommended: Epic Sci-Fi · Narrative Depth · Denis Villeneuve Fan
+      </div>
+
+      <!-- Meta Row -->
+      <div class="flex items-center gap-4 mb-6 text-sm">
+        <span class="text-yellow-400 font-bold"><i class="fa-solid fa-star text-xs mr-1"></i>8.8</span>
+        <span class="text-gray-500">|</span>
+        <span class="text-gray-400">2h 46m</span>
+        <span class="text-gray-500">|</span>
+        <span class="text-gray-400">Sci-Fi · Adventure</span>
+        <span class="text-gray-500">|</span>
+        <span class="text-gray-400 text-xs bg-gray-700/60 px-2 py-0.5 rounded">PG-13</span>
+      </div>
+
+      <!-- CTA Buttons -->
+      <div class="flex items-center gap-3 flex-wrap">
+        <button class="btn-play" onclick="openModal(movies[0])">
+          <i class="fa-solid fa-play text-xs"></i>
+          Play Trailer
+        </button>
+        <button class="btn-outline">
+          <i class="fa-solid fa-circle-info text-sm"></i>
+          More Info
+        </button>
+        <button class="btn-outline" title="Add to Watchlist">
+          <i class="fa-solid fa-plus text-sm"></i>
+          Watchlist
+        </button>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!--  MAIN CONTENT                              -->
+<!-- ══════════════════════════════════════════ -->
+<main class="relative z-10 bg-black px-6 md:px-12 lg:px-16 pb-20 space-y-14">
+
+
+  <!-- ── RECOMMENDATION ENGINE CONTROL CENTER ── -->
+  <section class="section-fade pt-10" id="controls">
+    <div class="flex items-center gap-3 mb-6">
+      <i class="fa-solid fa-sliders text-cyan-400"></i>
+      <h2 class="text-base font-bold text-white uppercase tracking-widest text-xs">Recommendation Engine</h2>
+      <span class="text-xs text-gray-600">— Tune your taste profile</span>
+    </div>
+
+    <div id="control-center">
+      <!-- Scanline accent top-right -->
+      <div class="absolute top-3 right-6 text-xs text-cyan-400/40 font-mono tracking-widest hidden md:block">CINEMATCH_AI v2.4</div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+
+        <!-- Mood -->
+        <div>
+          <p class="control-label">Mood</p>
+          <div class="pill-group" id="mood-pills">
+            <span class="pill active" data-group="mood">Feel Good</span>
+            <span class="pill" data-group="mood">Dark & Gritty</span>
+            <span class="pill" data-group="mood">Thought-Provoking</span>
+          </div>
+        </div>
+
+        <!-- Pacing -->
+        <div>
+          <p class="control-label">Pacing</p>
+          <div class="slider-track">
+            <input type="range" id="pacing-slider" min="0" max="100" value="65" />
+            <div class="slider-labels">
+              <span>Slow Burn</span>
+              <span id="pacing-val">65%</span>
+              <span>Fast-Paced</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Decade -->
+        <div>
+          <p class="control-label">Era</p>
+          <div class="pill-group" id="era-pills">
+            <span class="pill" data-group="era">80s</span>
+            <span class="pill" data-group="era">90s</span>
+            <span class="pill" data-group="era">2000s</span>
+            <span class="pill active" data-group="era">Recent</span>
+          </div>
+        </div>
+
+        <!-- Tone -->
+        <div>
+          <p class="control-label">Tone</p>
+          <div class="pill-group" id="tone-pills">
+            <span class="pill active" data-group="tone">Epic</span>
+            <span class="pill" data-group="tone">Intimate</span>
+            <span class="pill" data-group="tone">Comedic</span>
+            <span class="pill" data-group="tone">Surreal</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Similarity Score -->
+      <div class="mt-8 pt-6 border-t border-white/5 flex items-center justify-between flex-wrap gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
+          <span class="text-xs text-gray-500">AI is recalibrating your feed based on your preferences</span>
+        </div>
+        <button class="btn-play text-xs py-2 px-5" id="refresh-btn">
+          <i class="fa-solid fa-rotate-right text-xs"></i>
+          Refresh Recommendations
+        </button>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ── ROW 1: TOP PICKS ── -->
+  <section class="section-fade">
+    <div class="flex items-baseline justify-between mb-4">
+      <div>
+        <h2 class="section-title">
+          Top Picks For You
+          <span class="section-tag">AI Curated</span>
+        </h2>
+        <p class="section-subtitle">Personalized based on your watch history and taste profile</p>
+      </div>
+      <a href="#" class="text-xs text-cyan-400 hover:text-cyan-300 transition-colors font-semibold flex items-center gap-1">
+        See All <i class="fa-solid fa-chevron-right text-[10px]"></i>
+      </a>
+    </div>
+
+    <div class="row-wrapper" id="row-1-wrapper">
+      <button class="scroll-btn left" onclick="scrollRow('row-1', -1)">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+      <div class="row-scroll" id="row-1">
+        <!-- Cards injected by JS -->
+      </div>
+      <button class="scroll-btn right" onclick="scrollRow('row-1', 1)">
+        <i class="fa-solid fa-chevron-right"></i>
+      </button>
+    </div>
+  </section>
+
+
+  <!-- ── ROW 2: BECAUSE YOU WATCHED ── -->
+  <section class="section-fade">
+    <div class="flex items-baseline justify-between mb-4">
+      <div>
+        <h2 class="section-title">
+          <i class="fa-solid fa-link-slash text-purple-400 text-base"></i>
+          Because You Watched <span class="text-purple-400">Interstellar</span>
+        </h2>
+        <p class="section-subtitle">AI-matched on: Space Exploration · Emotional Depth · Hans Zimmer Score</p>
+      </div>
+      <a href="#" class="text-xs text-cyan-400 hover:text-cyan-300 transition-colors font-semibold flex items-center gap-1">
+        See All <i class="fa-solid fa-chevron-right text-[10px]"></i>
+      </a>
+    </div>
+
+    <div class="row-wrapper" id="row-2-wrapper">
+      <button class="scroll-btn left" onclick="scrollRow('row-2', -1)">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+      <div class="row-scroll" id="row-2">
+      </div>
+      <button class="scroll-btn right" onclick="scrollRow('row-2', 1)">
+        <i class="fa-solid fa-chevron-right"></i>
+      </button>
+    </div>
+  </section>
+
+
+  <!-- ── ROW 3: TRENDING GLOBALLY ── -->
+  <section class="section-fade">
+    <div class="flex items-baseline justify-between mb-4">
+      <div>
+        <h2 class="section-title">
+          <i class="fa-solid fa-fire-flame-curved text-orange-400 text-base"></i>
+          Trending Globally
+          <span class="section-tag" style="border-color:rgba(251,146,60,0.4);color:#fb923c;background:rgba(251,146,60,0.1)">LIVE</span>
+        </h2>
+        <p class="section-subtitle">What the world is watching right now</p>
+      </div>
+      <a href="#" class="text-xs text-cyan-400 hover:text-cyan-300 transition-colors font-semibold flex items-center gap-1">
+        See All <i class="fa-solid fa-chevron-right text-[10px]"></i>
+      </a>
+    </div>
+
+    <div class="row-wrapper" id="row-3-wrapper">
+      <button class="scroll-btn left" onclick="scrollRow('row-3', -1)">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+      <div class="row-scroll" id="row-3">
+      </div>
+      <button class="scroll-btn right" onclick="scrollRow('row-3', 1)">
+        <i class="fa-solid fa-chevron-right"></i>
+      </button>
+    </div>
+  </section>
+
+
+</main>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!--  FOOTER                                    -->
+<!-- ══════════════════════════════════════════ -->
+<footer class="bg-black px-8 md:px-16 py-12">
+  <div class="max-w-screen-xl mx-auto">
+    <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      <div>
+        <div class="nav-logo flex items-center gap-1 mb-2">
+          <i class="fa-solid fa-film text-cyan-400"></i>
+          <span class="font-black text-xl text-cyan-400">Cine</span>
+          <span class="font-black text-xl">Match</span>
+        </div>
+        <p class="text-gray-600 text-sm max-w-xs">Your AI-powered cinematic companion. Discover movies that truly match your taste.</p>
+      </div>
+      <div class="flex gap-8 text-sm text-gray-600">
+        <div class="space-y-2">
+          <p class="text-gray-400 font-semibold text-xs uppercase tracking-widest mb-3">Discover</p>
+          <a href="#" class="block hover:text-cyan-400 transition-colors">Top Picks</a>
+          <a href="#" class="block hover:text-cyan-400 transition-colors">New Releases</a>
+          <a href="#" class="block hover:text-cyan-400 transition-colors">Genres</a>
+        </div>
+        <div class="space-y-2">
+          <p class="text-gray-400 font-semibold text-xs uppercase tracking-widest mb-3">Account</p>
+          <a href="#" class="block hover:text-cyan-400 transition-colors">Watchlist</a>
+          <a href="#" class="block hover:text-cyan-400 transition-colors">Taste Profile</a>
+          <a href="#" class="block hover:text-cyan-400 transition-colors">Settings</a>
+        </div>
+      </div>
+    </div>
+    <div class="border-t border-white/5 mt-8 pt-6 flex items-center justify-between">
+      <p class="text-gray-700 text-xs">© 2025 CineMatch. Built for the CineMatch Recommendation Platform.</p>
+      <p class="text-gray-700 text-xs hidden md:block">Powered by TF-IDF · Cosine Similarity · TMDB API</p>
+    </div>
+  </div>
+</footer>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!--  MODAL                                     -->
+<!-- ══════════════════════════════════════════ -->
+<div id="modal-overlay" onclick="handleModalOverlayClick(event)">
+  <div id="modal">
+
+    <!-- Hero Backdrop -->
+    <div class="modal-hero">
+      <img id="modal-backdrop" src="" alt="" />
+      <div class="modal-hero-gradient"></div>
+      <div class="modal-hero-left"></div>
+      <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+
+      <div class="modal-hero-content">
+        <div id="modal-match" class="match-badge mb-3"></div>
+        <h2 id="modal-title" class="text-3xl font-black text-white mb-1"></h2>
+        <p id="modal-year" class="text-gray-400 text-sm"></p>
+      </div>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-7 space-y-6">
+
+      <!-- Rating + Platforms Row -->
+      <div class="flex items-center justify-between flex-wrap gap-4">
+        <div class="flex items-center gap-5">
+          <div>
+            <p class="text-xs text-gray-600 mb-1">IMDb Rating</p>
+            <p class="rating-star font-bold text-lg"><i class="fa-solid fa-star text-sm"></i> <span id="modal-rating"></span></p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-600 mb-1">Runtime</p>
+            <p class="text-white font-semibold" id="modal-runtime"></p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-600 mb-1">Genre</p>
+            <p class="text-white font-semibold" id="modal-genre"></p>
+          </div>
+        </div>
+        <div>
+          <p class="text-xs text-gray-600 mb-2">Streaming On</p>
+          <div class="flex gap-2 flex-wrap" id="modal-platforms"></div>
+        </div>
+      </div>
+
+      <!-- Synopsis -->
+      <div>
+        <h3 class="text-xs font-bold text-gray-600 uppercase tracking-widest mb-2">Synopsis</h3>
+        <p id="modal-synopsis" class="text-gray-300 text-sm leading-relaxed"></p>
+      </div>
+
+      <!-- AI Reason -->
+      <div class="p-4 rounded-xl border" style="background:rgba(168,85,247,0.07);border-color:rgba(168,85,247,0.2)">
+        <p class="text-xs font-bold text-purple-400 uppercase tracking-widest mb-2">
+          <i class="fa-solid fa-brain mr-2"></i>Why CineMatch Recommended This
+        </p>
+        <div class="flex flex-wrap gap-2" id="modal-reasons"></div>
+      </div>
+
+      <!-- Cast -->
+      <div>
+        <h3 class="text-xs font-bold text-gray-600 uppercase tracking-widest mb-3">Cast</h3>
+        <div class="flex gap-4 flex-wrap" id="modal-cast"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex items-center gap-3 flex-wrap pt-2 border-t border-white/5">
+        <button class="btn-play text-sm py-2.5 px-6">
+          <i class="fa-solid fa-play text-xs"></i> Watch Now
+        </button>
+        <button class="btn-outline text-sm py-2.5 px-5">
+          <i class="fa-solid fa-plus text-sm"></i> Watchlist
+        </button>
+        <button class="dont-show-btn ml-auto" onclick="closeModal()">
+          <i class="fa-solid fa-ban text-xs"></i> Don't Show Again
+        </button>
+      </div>
+
+      <!-- Similar Recommendations -->
+      <div>
+        <h3 class="text-xs font-bold text-gray-600 uppercase tracking-widest mb-3">Similar Recommendations</h3>
+        <div class="flex gap-3 overflow-x-auto pb-2" id="modal-similar" style="scrollbar-width:none;"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!--  JAVASCRIPT                                -->
+<!-- ══════════════════════════════════════════ -->
+<script>
+
+// ─── DATA ───────────────────────────────────────────────
+const movies = [
+  {
+    id: 1,
+    title: "Dune: Part Two",
+    year: "2024",
+    match: 98,
+    rating: 8.8,
+    runtime: "2h 46m",
+    genre: "Sci-Fi · Adventure",
+    synopsis: "Paul Atreides unites with Chani and the Fremen while seeking revenge against the conspirators who destroyed his family. Facing a choice between the love of his life and the fate of the known universe.",
+    poster: "https://images.unsplash.com/photo-1534809027769-b00d750a6bac?w=400&q=80",
+    backdrop: "https://images.unsplash.com/photo-1534809027769-b00d750a6bac?w=1200&q=85",
+    platforms: ["Max", "Apple TV+"],
+    reasons: ["Epic Sci-Fi", "Narrative Depth", "Denis Villeneuve", "World-Building"],
+    cast: [
+      { name: "Timothée Chalamet", img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&q=80" },
+      { name: "Zendaya", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&q=80" },
+      { name: "Rebecca Ferguson", img: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&q=80" },
+    ]
+  },
+  {
+    id: 2,
+    title: "Oppenheimer",
+    year: "2023",
+    match: 96,
+    rating: 8.9,
+    runtime: "3h 0m",
+    genre: "Drama · History",
+    synopsis: "The story of J. Robert Oppenheimer's role in the development of the atomic bomb during World War II, and the political fallout that followed.",
+    poster: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&q=80",
+    backdrop: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=85",
+    platforms: ["Peacock", "Prime Video"],
+    reasons: ["Historical Drama", "Christopher Nolan", "Complex Narrative", "Oscar Winner"],
+    cast: [
+      { name: "Cillian Murphy", img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&q=80" },
+      { name: "Emily Blunt", img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&q=80" },
+      { name: "Matt Damon", img: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=80&q=80" },
+    ]
+  },
+  {
+    id: 3,
+    title: "Past Lives",
+    year: "2023",
+    match: 94,
+    rating: 8.0,
+    runtime: "1h 46m",
+    genre: "Romance · Drama",
+    synopsis: "Two childhood sweethearts are separated when one of them emigrates. Two decades later, they reunite in New York for one week, prompting questions about love and fate.",
+    poster: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=400&q=80",
+    backdrop: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=85",
+    platforms: ["Max", "Mubi"],
+    reasons: ["Emotional Depth", "Arthouse Cinema", "Character Study", "A24"],
+    cast: [
+      { name: "Greta Lee", img: "https://images.unsplash.com/photo-1499952127939-9bbf5af6c51c?w=80&q=80" },
+      { name: "Teo Yoo", img: "https://images.unsplash.com/photo-1488161628813-04466f872be2?w=80&q=80" },
+    ]
+  },
+  {
+    id: 4,
+    title: "Poor Things",
+    year: "2023",
+    match: 91,
+    rating: 8.0,
+    runtime: "2h 21m",
+    genre: "Sci-Fi · Comedy",
+    synopsis: "Bella Baxter, a young woman brought back to life by a brilliant and unorthodox scientist, sets out on a journey across continents.",
+    poster: "https://images.unsplash.com/photo-1549032305-e816fabf0dd2?w=400&q=80",
+    backdrop: "https://images.unsplash.com/photo-1549032305-e816fabf0dd2?w=1200&q=85",
+    platforms: ["Disney+", "Hulu"],
+    reasons: ["Yorgos Lanthimos", "Surreal Visuals", "Emma Stone", "Golden Globe Winner"],
+    cast: [
+      { name: "Emma Stone", img: "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=80&q=80" },
+      { name: "Mark Ruffalo", img: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&q=80" },
+    ]
+  },
+  {
+    id: 5,
+    title: "Killers of the Flower Moon",
+    year: "2023",
+    match: 93,
+    rating: 7.7,
+    runtime: "3h 26m",
+    genre: "Crime · History",
+    synopsis: "Members of the Osage Nation are murdered under mysterious circumstances in 1920s Oklahoma, sparking a major FBI investigation.",
+    poster: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&q=80",
+    backdrop: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1200&q=85",
+    platforms: ["Apple TV+"],
+    reasons: ["Scorsese Direction", "Historical Crime", "Epic Scale", "Period Drama"],
+    cast: [
+      { name: "Leonardo DiCaprio", img: "https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=80&q=80" },
+      { name: "Robert De Niro", img: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=80&q=80" },
+    ]
+  },
+  {
+    id: 6,
+    title: "Anatomy of a Fall",
+    year: "2023",
+    match: 89,
+    rating: 7.7,
+    runtime: "2h 31m",
+    genre: "Thriller · Drama",
+    synopsis: "A woman is suspected of her husband's death after his body is found at the base of their chalet. Her son, partially blind, witnessed the scene.",
+    poster: "https://images.unsplash.com/photo-1542261777448-23d2a9e529b2?w=400&q=80",
+    backdrop: "https://images.unsplash.com/photo-1542261777448-23d2a9e529b2?w=1200&q=85",
+    platforms: ["Mubi", "Prime Video"],
+    reasons: ["Palme d'Or Winner", "Legal Thriller", "Psychological Drama", "French Cinema"],
+    cast: [
+      { name: "Sandra Hüller", img: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=80&q=80" },
+      { name: "Swann Arlaud", img: "https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=80&q=80" },
+    ]
+  },
+  {
+    id: 7,
+    title: "The Zone of Interest",
+    year: "2023",
+    match: 88,
+    rating: 7.4,
+    runtime: "1h 45m",
+    genre: "History · Drama",
+    synopsis: "The commandant of Auschwitz and his wife try to build a dream life for their family in a house beside the camp.",
+    poster: "https://images.unsplash.com/photo-1520209268518-aec60b8bb5ca?w=400&q=80",
+    backdrop: "https://images.unsplash.com/photo-1520209268518-aec60b8bb5ca?w=1200&q=85",
+    platforms: ["MUBI", "Criterion"],
+    reasons: ["Jonathan Glazer", "Oscar Best International", "Harrowing Premise", "Art House"],
+    cast: [
+      { name: "Christian Friedel", img: "https://images.unsplash.com/photo-1564564321837-a57b7070ac4f?w=80&q=80" },
+      { name: "Sandra Hüller", img: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=80&q=80" },
+    ]
+  },
+  {
+    id: 8,
+    title: "Asteroid City",
+    year: "2023",
+    match: 86,
+    rating: 6.6,
+    runtime: "1h 45m",
+    genre: "Comedy · Drama",
+    synopsis: "The itinerary of a junior stargazer/space cadet competition is spectacularly disrupted by world-changing events.",
+    poster: "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=400&q=80",
+    backdrop: "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=1200&q=85",
+    platforms: ["Netflix", "Prime Video"],
+    reasons: ["Wes Anderson", "Ensemble Cast", "Visual Storytelling", "Deadpan Humor"],
+    cast: [
+      { name: "Jason Schwartzman", img: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=80&q=80" },
+      { name: "Scarlett Johansson", img: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=80&q=80" },
+    ]
+  },
+  {
+    id: 9,
+    title: "Interstellar",
+    year: "2014",
+    match: 99,
+    rating: 8.7,
+    runtime: "2h 49m",
+    genre: "Sci-Fi · Drama",
+    synopsis: "A team of explorers travel through a wormhole in space in an attempt to ensure humanity's survival as Earth faces environmental catastrophe.",
+    poster: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=400&q=80",
+    backdrop: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=1200&q=85",
+    platforms: ["Netflix", "Paramount+"],
+    reasons: ["Christopher Nolan", "Space Exploration", "Hans Zimmer Score", "Emotional Sci-Fi"],
+    cast: [
+      { name: "Matthew McConaughey", img: "https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=80&q=80" },
+      { name: "Anne Hathaway", img: "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=80&q=80" },
+    ]
+  },
+  {
+    id: 10,
+    title: "Arrival",
+    year: "2016",
+    match: 97,
+    rating: 7.9,
+    runtime: "1h 56m",
+    genre: "Sci-Fi · Thriller",
+    synopsis: "A linguist works with the military to communicate with alien life forms after twelve mysterious spacecraft appear around the world.",
+    poster: "https://images.unsplash.com/photo-1446776877081-d282a0f896e2?w=400&q=80",
+    backdrop: "https://images.unsplash.com/photo-1446776877081-d282a0f896e2?w=1200&q=85",
+    platforms: ["Netflix", "Max"],
+    reasons: ["Denis Villeneuve", "Linguistic Sci-Fi", "Non-linear Narrative", "Emotional Depth"],
+    cast: [
+      { name: "Amy Adams", img: "https://images.unsplash.com/photo-1488716820095-cbe80883c496?w=80&q=80" },
+      { name: "Jeremy Renner", img: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=80&q=80" },
+    ]
+  },
+  {
+    id: 11,
+    title: "Gravity",
+    year: "2013",
+    match: 92,
+    rating: 7.7,
+    runtime: "1h 31m",
+    genre: "Sci-Fi · Thriller",
+    synopsis: "Two astronauts work together to survive after an accident leaves them stranded in space.",
+    poster: "https://images.unsplash.com/photo-1454789548928-9efd52dc4031?w=400&q=80",
+    backdrop: "https://images.unsplash.com/photo-1454789548928-9efd52dc4031?w=1200&q=85",
+    platforms: ["Netflix"],
+    reasons: ["Alfonso Cuarón", "Visual Spectacle", "Space Survival", "Sandra Bullock"],
+    cast: [
+      { name: "Sandra Bullock", img: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=80&q=80" },
+      { name: "George Clooney", img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&q=80" },
+    ]
+  },
+  {
+    id: 12,
+    title: "2001: A Space Odyssey",
+    year: "1968",
+    match: 95,
+    rating: 8.3,
+    runtime: "2h 29m",
+    genre: "Sci-Fi",
+    synopsis: "Humanity finds a mysterious object buried beneath the lunar surface and, with the help of AI HAL 9000, sets off on a quest.",
+    poster: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=400&q=80",
+    backdrop: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=1200&q=85",
+    platforms: ["Max", "Criterion"],
+    reasons: ["Stanley Kubrick", "Foundational Sci-Fi", "Philosophical Depth", "Visual Pioneer"],
+    cast: [
+      { name: "Keir Dullea", img: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=80&q=80" },
+    ]
+  },
+];
+
+// ─── ROW ASSIGNMENT ─────────────────────────────────────
+const rows = {
+  'row-1': movies.slice(0, 8),
+  'row-2': [movies[8], movies[9], movies[10], movies[11], movies[3], movies[4], movies[5]],
+  'row-3': [movies[1], movies[0], movies[4], movies[2], movies[7], movies[6], movies[11], movies[10]],
+};
+
+// ─── RENDER CARDS ───────────────────────────────────────
+function buildCard(movie) {
+  const card = document.createElement('div');
+  card.className = 'movie-card';
+  card.innerHTML = `
+    <img src="${movie.poster}" alt="${movie.title}" loading="lazy" />
+    <div class="card-match">${movie.match}% Match</div>
+    <div class="card-play-icon"><i class="fa-solid fa-play" style="margin-left:2px;"></i></div>
+    <div class="card-overlay">
+      <div class="card-title">${movie.title}</div>
+      <div class="card-meta">
+        <span class="rating-star"><i class="fa-solid fa-star" style="font-size:9px;"></i> ${movie.rating}</span>
+        <span>·</span>
+        <span>${movie.year}</span>
+      </div>
+      <div class="card-genres">
+        ${movie.genre.split('·').slice(0,2).map(g => `<span class="genre-tag">${g.trim()}</span>`).join('')}
+      </div>
+    </div>
+  `;
+  card.addEventListener('click', () => openModal(movie));
+  return card;
+}
+
+function renderRows() {
+  Object.entries(rows).forEach(([rowId, movieList]) => {
+    const container = document.getElementById(rowId);
+    movieList.forEach(movie => container.appendChild(buildCard(movie)));
+  });
+}
+
+// ─── SCROLL BUTTONS ─────────────────────────────────────
+function scrollRow(rowId, direction) {
+  const el = document.getElementById(rowId);
+  el.scrollBy({ left: direction * 600, behavior: 'smooth' });
+}
+
+// ─── MODAL ──────────────────────────────────────────────
+function openModal(movie) {
+  document.getElementById('modal-backdrop').src = movie.backdrop;
+  document.getElementById('modal-match').innerHTML = `<i class="fa-solid fa-circle-check" style="font-size:10px;margin-right:4px;"></i>${movie.match}% Match For You`;
+  document.getElementById('modal-title').textContent = movie.title;
+  document.getElementById('modal-year').textContent = `${movie.year} · ${movie.runtime} · ${movie.genre}`;
+  document.getElementById('modal-rating').textContent = movie.rating;
+  document.getElementById('modal-runtime').textContent = movie.runtime;
+  document.getElementById('modal-genre').textContent = movie.genre;
+  document.getElementById('modal-synopsis').textContent = movie.synopsis;
+
+  // Platforms
+  const platformsEl = document.getElementById('modal-platforms');
+  platformsEl.innerHTML = movie.platforms.map(p =>
+    `<span class="platform-badge"><i class="fa-solid fa-circle-play" style="font-size:10px;color:#00f2fe;"></i>${p}</span>`
+  ).join('');
+
+  // AI Reasons
+  const reasonsEl = document.getElementById('modal-reasons');
+  reasonsEl.innerHTML = movie.reasons.map(r =>
+    `<span class="why-pill"><i class="fa-solid fa-bolt" style="font-size:9px;"></i>${r}</span>`
+  ).join('');
+
+  // Cast
+  const castEl = document.getElementById('modal-cast');
+  castEl.innerHTML = movie.cast.map(c => `
+    <div class="flex flex-col items-center gap-1">
+      <img src="${c.img}" alt="${c.name}" class="cast-avatar" />
+      <span style="font-size:10px;color:var(--text-secondary);text-align:center;max-width:60px;line-height:1.3;">${c.name}</span>
+    </div>
+  `).join('');
+
+  // Similar
+  const similarEl = document.getElementById('modal-similar');
+  const similar = movies.filter(m => m.id !== movie.id).slice(0, 7);
+  similarEl.innerHTML = similar.map(m => `
+    <div class="mini-card" onclick="openModal(${JSON.stringify(m).replace(/"/g, '&quot;')})">
+      <img src="${m.poster}" alt="${m.title}" loading="lazy" />
+      <div class="mini-card-title">${m.title}</div>
+    </div>
+  `).join('');
+
+  const overlay = document.getElementById('modal-overlay');
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+function handleModalOverlayClick(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+
+// ─── PILL INTERACTIONS ──────────────────────────────────
+document.querySelectorAll('.pill').forEach(pill => {
+  pill.addEventListener('click', function () {
+    const group = this.dataset.group;
+    document.querySelectorAll(`.pill[data-group="${group}"]`).forEach(p => {
+      p.classList.remove('active', 'active-purple');
+    });
+    this.classList.add('active');
+  });
+});
+
+// ─── SLIDER ─────────────────────────────────────────────
+const pacingSlider = document.getElementById('pacing-slider');
+const pacingVal = document.getElementById('pacing-val');
+pacingSlider.addEventListener('input', function () {
+  pacingVal.textContent = Math.round(this.value) + '%';
+  const pct = this.value;
+  this.style.background = `linear-gradient(to right, var(--cyan) 0%, var(--cyan) ${pct}%, rgba(255,255,255,0.1) ${pct}%, rgba(255,255,255,0.1) 100%)`;
+});
+// Init fill
+pacingSlider.style.background = `linear-gradient(to right, var(--cyan) 0%, var(--cyan) 65%, rgba(255,255,255,0.1) 65%, rgba(255,255,255,0.1) 100%)`;
+
+// ─── REFRESH BTN ────────────────────────────────────────
+document.getElementById('refresh-btn').addEventListener('click', function () {
+  this.innerHTML = '<i class="fa-solid fa-rotate-right fa-spin text-xs"></i> Refreshing...';
+  setTimeout(() => {
+    this.innerHTML = '<i class="fa-solid fa-rotate-right text-xs"></i> Refresh Recommendations';
+  }, 1600);
+});
+
+// ─── NAVBAR SCROLL ──────────────────────────────────────
+window.addEventListener('scroll', () => {
+  const navbar = document.getElementById('navbar');
+  if (window.scrollY > 60) navbar.classList.add('scrolled');
+  else navbar.classList.remove('scrolled');
+});
+
+// ─── INTERSECTION OBSERVER (section fade-in) ────────────
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.08 });
+
+document.querySelectorAll('.section-fade').forEach(el => observer.observe(el));
+
+// ─── INIT ────────────────────────────────────────────────
+renderRows();
+
+</script>
+</body>
+</html>
