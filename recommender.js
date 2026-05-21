@@ -173,9 +173,9 @@ async function loadMovieLensDatabase() {
     movieLensData.loaded = true;
     updateDatabaseStatus('ratings', 'Loaded');
     
-    // Render rows (calls initializeRecommender internally) then build trending + hero
     renderRows();
     buildTrending();
+    if (typeof buildPlatforms === 'function') buildPlatforms();
     if (typeof initHero === 'function') initHero();
     
   } catch (err) {

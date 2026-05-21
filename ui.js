@@ -91,6 +91,182 @@ async function fetchTMDBDetails(movieId) {
   }
 }
 
+/* ─── WEB AUDIO API SYNTHESIZER ─── */
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function getCtx() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+function playTick() {
+  try {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.04);
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.06);
+  } catch(e){}
+}
+
+function playSpinAccel() {
+  let delay = 0;
+  const ticks = 28;
+  for (let i = 0; i < ticks; i++) {
+    const progress = i / ticks;
+    delay += 60 + progress * 160;
+    setTimeout(playTick, delay);
+  }
+}
+
+function playWhoosh() {
+  try {
+    const ctx = getCtx();
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.35, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+    const src = ctx.createBufferSource();
+    const filter = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+    src.buffer = buf;
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(800, ctx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.35);
+    filter.Q.value = 2;
+    gain.gain.setValueAtTime(0.22, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+    src.start(); src.stop(ctx.currentTime + 0.35);
+  } catch(e){}
+}
+
+function playWin() {
+  try {
+    const ctx = getCtx();
+    const notes = [523, 659, 784, 1047]; // C E G C
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      const t = ctx.currentTime + i * 0.12;
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.18, t + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+      osc.start(t); osc.stop(t + 0.5);
+    });
+  } catch(e){}
+}
+
+function playClick() {
+  try {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(300, ctx.currentTime);
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    osc.start(); osc.stop(ctx.currentTime + 0.08);
+  } catch(e){}
+}
+
+/* ─── SHARED FLOATING POPUP (NETFLIX-STYLE) ─── */
+const popup = document.getElementById('card-popup');
+let hideTimer = null;
+let popupTimer = null;
+let currentPopupMovie = null;
+
+function schedulePopup(movie, cardEl) {
+  clearTimeout(popupTimer);
+  clearTimeout(hideTimer);
+  popupTimer = setTimeout(() => showPopup(movie, cardEl), 280);
+}
+
+function cancelPopup() {
+  clearTimeout(popupTimer);
+  hideTimer = setTimeout(() => hidePopup(), 120);
+}
+
+function showPopup(movie, cardEl) {
+  if (!popup) return;
+  currentPopupMovie = movie;
+  
+  // Populate
+  document.getElementById('pp-img').src = movie.backdrop || movie.poster;
+  document.getElementById('pp-match').textContent = movie.match + '% Match';
+  document.getElementById('pp-rating').textContent = movie.rating || '...';
+  document.getElementById('pp-cert').textContent = movie.cert || 'PG-13';
+  document.getElementById('pp-title').textContent = movie.title;
+  
+  // Genres
+  const genres = (movie.genre || "").split('·').map(g => g.trim());
+  document.getElementById('pp-genres').innerHTML = genres.map((g, i) =>
+    i < genres.length - 1 ? `<span>${g}</span><span class="pg-dot"></span>` : `<span>${g}</span>`
+  ).join('');
+  
+  // Add btn state
+  const addBtn = document.getElementById('pp-add');
+  const inList = watchlist.find(m => m.id === movie.id);
+  addBtn.classList.toggle('added', !!inList);
+  addBtn.innerHTML = inList
+    ? '<i class="fa-solid fa-check" style="font-size:10px"></i>'
+    : '<i class="fa-solid fa-plus" style="font-size:10px"></i>';
+
+  // Wire buttons
+  document.getElementById('pp-play').onclick = () => openModal(movie);
+  document.getElementById('pp-info').onclick = () => openModal(movie);
+  document.getElementById('pp-add').onclick = (e) => {
+    e.stopPropagation();
+    addToWatchlist(movie, e.currentTarget);
+    e.currentTarget.classList.add('added');
+    e.currentTarget.innerHTML = '<i class="fa-solid fa-check" style="font-size:10px"></i>';
+  };
+
+  // Position — center above or below card, clamp to viewport
+  const rect = cardEl.getBoundingClientRect();
+  const pw = 268, ph = 320;
+  let left = rect.left + rect.width / 2 - pw / 2;
+  let top  = rect.top - ph - 8;
+
+  // Flip below if not enough room above
+  if (top < 70) top = rect.bottom + 8;
+
+  // Clamp horizontally
+  left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+
+  popup.style.left = left + 'px';
+  popup.style.top  = (top + window.scrollY) + 'px'; // Account for page scroll
+  popup.classList.remove('hiding');
+  popup.classList.add('visible');
+}
+
+function hidePopup() {
+  if (!popup) return;
+  clearTimeout(popupTimer);
+  popup.classList.add('hiding');
+  setTimeout(() => {
+    popup.classList.remove('visible', 'hiding');
+    currentPopupMovie = null;
+  }, 220);
+}
+
+if (popup) {
+  popup.addEventListener('mouseenter', () => { clearTimeout(hideTimer); clearTimeout(popupTimer); });
+  popup.addEventListener('mouseleave', () => hidePopup());
+}
+
 /* ─── RENDER MOVIES CARD ─── */
 function buildCard(movieId) {
   const wrap = document.createElement('div');
@@ -100,6 +276,7 @@ function buildCard(movieId) {
   let cleanTitle = "Loading...";
   let year = "";
   let genresList = "";
+  let match = calculateMatchScore(movieId);
   
   if (movieLensData.loaded) {
     const movie = movieLensData.movies[movieId];
@@ -117,80 +294,82 @@ function buildCard(movieId) {
     }
   }
   
-  const match = calculateMatchScore(movieId);
-  
+  const alreadyIn = watchlist.some(m => m.id === movieId);
   wrap.innerHTML = `
-    <div class="card-inner">
-      <div class="card-poster">
-        <img class="lazy-poster" src="https://images.unsplash.com/photo-1549032305-e816fabf0dd2?w=400&q=80" alt="${cleanTitle}" style="opacity: 0.35; transition: opacity 0.5s var(--smooth)"/>
-        <div class="m-badge">${match}%</div>
-        <button class="card-add" title="Add to watchlist" data-id="${movieId}">
-          <i class="fa-solid fa-plus"></i>
-        </button>
-        <div class="card-poster-fade"></div>
-      </div>
-      <div class="card-info">
-        <div>
-          <div class="ci-title">${cleanTitle}</div>
-          <div class="ci-meta">
-            <span class="ci-rating"><i class="fa-solid fa-star" style="font-size:9px"></i> ...</span>
-            <span>·</span><span>${year}</span>
-          </div>
-          <div class="ci-synopsis">Loading overview...</div>
-          <div class="ci-tags">
-            ${genresList.split('·').slice(0, 2).map(g=>`<span class="ci-tag">${g.trim()}</span>`).join('')}
-          </div>
-        </div>
-        <div class="ci-btns">
-          <button class="ci-btn play" data-open="${movieId}">
-            <i class="fa-solid fa-circle-info" style="font-size:9px"></i> Details
-          </button>
-          <button class="ci-btn wl" data-add="${movieId}">
-            <i class="fa-solid fa-plus" style="font-size:9px"></i>
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
+    <div class="card-thumb">
+      <img class="lazy-poster" src="https://images.unsplash.com/photo-1549032305-e816fabf0dd2?w=400&q=80" alt="${cleanTitle}" style="opacity: 0.35; transition: opacity 0.5s var(--smooth)"/>
+      <div class="m-badge">${match}%</div>
+      <button class="card-quick-add${alreadyIn ? ' added' : ''}" data-id="${movieId}" title="${alreadyIn ? 'Remove from Watchlist' : 'Add to Watchlist'}">
+        ${alreadyIn ? '<i class="fa-solid fa-check" style="font-size:9px"></i>' : '<i class="fa-solid fa-plus" style="font-size:9px"></i>'}
+      </button>
+    </div>`;
 
-  // ── Bug 3 fix: attach placeholder listeners immediately so buttons are
-  //    never silently non-functional while TMDB is still loading ──────────
   let resolvedDetails = null;
-
-  const cardAddBtn  = wrap.querySelector('.card-add');
-  const openBtn     = wrap.querySelector('[data-open]');
-  const addBtn      = wrap.querySelector('[data-add]');
+  const cardAddBtn = wrap.querySelector('.card-quick-add');
 
   const handleOpen = (e) => {
     if (e) e.stopPropagation();
-    if (resolvedDetails) openModal(resolvedDetails);
-  };
-  const handleAdd = (e, triggerEl) => {
-    if (e) e.stopPropagation();
-    if (resolvedDetails) addToWatchlist(resolvedDetails, triggerEl);
+    if (resolvedDetails) {
+      openModal(resolvedDetails);
+    } else {
+      const fallbackMock = {
+        id: movieId,
+        title: cleanTitle,
+        year: year,
+        match: match,
+        rating: "...",
+        runtime: "N/A",
+        genre: genresList,
+        synopsis: "Loading details from TMDb...",
+        poster: "https://images.unsplash.com/photo-1549032305-e816fabf0dd2?w=400&q=80",
+        backdrop: "https://images.unsplash.com/photo-1549032305-e816fabf0dd2?w=1200&q=85",
+        platforms: ["Streaming"],
+        reasons: ["Popular Choice"],
+        cast: []
+      };
+      openModal(fallbackMock);
+    }
   };
 
-  wrap.addEventListener('click', () => handleOpen(null));
-  cardAddBtn.addEventListener('click', e => handleAdd(e, cardAddBtn));
-  addBtn.addEventListener('click', e => handleAdd(e, addBtn));
-  openBtn.addEventListener('click', e => handleOpen(e));
+  const handleAdd = (e) => {
+    if (e) e.stopPropagation();
+    toggleWatchlist(resolvedDetails || fallbackMock);
+  };
+
+  wrap.addEventListener('click', handleOpen);
+  cardAddBtn.addEventListener('click', handleAdd);
+
+  const fallbackMock = {
+    id: movieId,
+    title: cleanTitle,
+    year: year,
+    match: match,
+    rating: "...",
+    runtime: "N/A",
+    genre: genresList,
+    synopsis: "Loading details from TMDb...",
+    poster: "https://images.unsplash.com/photo-1549032305-e816fabf0dd2?w=400&q=80",
+    backdrop: "https://images.unsplash.com/photo-1549032305-e816fabf0dd2?w=1200&q=85",
+    platforms: ["Streaming"],
+    reasons: ["Popular Choice"],
+    cast: []
+  };
+
+  wrap.addEventListener('mouseenter', () => schedulePopup(resolvedDetails || fallbackMock, wrap));
+  wrap.addEventListener('mouseleave', () => cancelPopup());
 
   fetchTMDBDetails(movieId).then(details => {
     if (!details) return;
-    resolvedDetails = details; // upgrade the closure so all handlers use real data
+    resolvedDetails = details;
 
     const img = wrap.querySelector('.lazy-poster');
     if (img) {
       img.src = details.poster;
       img.style.opacity = 1;
     }
-    const ratingEl = wrap.querySelector('.ci-rating');
-    if (ratingEl) {
-      ratingEl.innerHTML = `<i class="fa-solid fa-star" style="font-size:9px"></i> ${details.rating}`;
-    }
-    const synEl = wrap.querySelector('.ci-synopsis');
-    if (synEl) {
-      synEl.textContent = details.synopsis;
+    
+    if (currentPopupMovie && currentPopupMovie.id === movieId) {
+      showPopup(details, wrap);
     }
   });
   
@@ -199,7 +378,8 @@ function buildCard(movieId) {
 
 /* ─── RENDER TRENDING GRID ─── */
 function buildTrending() {
-  const grid = document.getElementById('trending-grid');
+  const grid = document.getElementById('trend-row');
+  if (!grid) return;
   grid.innerHTML = '';
   
   const trendingIds = [1, 296, 318, 356, 593, 260, 2571, 480];
@@ -233,17 +413,29 @@ function buildTrending() {
 }
 
 function renderTrendingGrid(ids) {
-  const grid = document.getElementById('trending-grid');
+  const grid = document.getElementById('trend-row');
+  if (!grid) return;
   grid.innerHTML = '';
   
   ids.forEach((movieId, i) => {
     let cleanTitle = `MovieLens #${movieId}`;
+    let genresList = 'Drama';
+    let year = '';
+    
     if (movieLensData.loaded) {
       const movie = movieLensData.movies[movieId];
-      if (movie) cleanTitle = movie.title.replace(/\s\(\d{4}\)$/, '');
+      if (movie) {
+        cleanTitle = movie.title.replace(/\s\(\d{4}\)$/, '');
+        year = movie.title.match(/\((\d{4})\)$/)?.[1] || '';
+        genresList = movie.genres.replace(/\|/g, ' · ');
+      }
     } else {
       const fallback = MOVIES.find(m => m.id === movieId);
-      if (fallback) cleanTitle = fallback.title;
+      if (fallback) {
+        cleanTitle = fallback.title;
+        year = fallback.year;
+        genresList = fallback.genre;
+      }
     }
     
     const card = document.createElement('div');
@@ -251,22 +443,42 @@ function renderTrendingGrid(ids) {
     card.innerHTML = `
       <img class="lazy-poster" src="https://images.unsplash.com/photo-1549032305-e816fabf0dd2?w=400&q=80" alt="${cleanTitle}" style="opacity: 0.35; transition: opacity 0.5s var(--smooth)"/>
       <div class="trend-num">${i + 1}</div>
-      ${i < 3 ? `<div class="trend-badge"><i class="fa-solid fa-fire" style="font-size:9px"></i> Hot</div>` : ''}
+      ${i < 3 ? `<div class="trend-badge"><span class="live-dot"></span>#${i + 1} Today</div>` : ''}
       <div class="trend-overlay"></div>
       <div class="trend-info">
         <div class="trend-title">${cleanTitle}</div>
         <div class="trend-meta">
           <span class="trend-rating"><i class="fa-solid fa-star" style="font-size:9px"></i> ...</span>
+          <span style="color:var(--t3)">·</span><span>${year}</span>
         </div>
         <div class="trend-btns">
           <button class="trend-btn play"><i class="fa-solid fa-circle-info" style="font-size:9px"></i> Details</button>
-          <button class="trend-btn add"><i class="fa-solid fa-plus" style="font-size:9px"></i></button>
+          <button class="trend-btn add"><i class="fa-solid fa-plus" style="font-size:9px"></i> Add</button>
         </div>
       </div>
     `;
     
+    let resolvedDetails = null;
+    const playBtn = card.querySelector('.trend-btn.play');
+    const addBtn = card.querySelector('.trend-btn.add');
+    
+    const handleOpen = (e) => {
+      if (e) e.stopPropagation();
+      if (resolvedDetails) openModal(resolvedDetails);
+    };
+    const handleAdd = (e, triggerEl) => {
+      if (e) e.stopPropagation();
+      if (resolvedDetails) addToWatchlist(resolvedDetails, triggerEl);
+    };
+    
+    card.addEventListener('click', () => handleOpen(null));
+    playBtn.addEventListener('click', e => handleOpen(e));
+    addBtn.addEventListener('click', e => handleAdd(e, addBtn));
+    card.querySelector('img').addEventListener('click', (e) => { e.stopPropagation(); handleOpen(null); });
+    
     fetchTMDBDetails(movieId).then(details => {
       if (!details) return;
+      resolvedDetails = details;
       const img = card.querySelector('.lazy-poster');
       if (img) {
         img.src = details.poster;
@@ -274,12 +486,8 @@ function renderTrendingGrid(ids) {
       }
       const ratingEl = card.querySelector('.trend-rating');
       if (ratingEl) {
-        ratingEl.innerHTML = `<i class="fa-solid fa-star" style="font-size:9px"></i> ${details.rating} · ${details.year}`;
+        ratingEl.innerHTML = `<i class="fa-solid fa-star" style="font-size:9px"></i> ${details.rating}`;
       }
-      
-      card.querySelector('.trend-btn.play').addEventListener('click', e => { e.stopPropagation(); openModal(details); });
-      card.querySelector('.trend-btn.add').addEventListener('click', e => { e.stopPropagation(); addToWatchlist(details, card.querySelector('.trend-btn.add')); });
-      card.querySelector('img').addEventListener('click', () => openModal(details));
     });
     grid.appendChild(card);
   });
@@ -289,6 +497,7 @@ function renderTrendingGrid(ids) {
 function renderRows() {
   const rw1 = document.getElementById('rw1');
   const rw2 = document.getElementById('rw2');
+  if (!rw1 || !rw2) return;
   
   rw1.innerHTML = '';
   rw2.innerHTML = '';
@@ -307,61 +516,463 @@ function renderRows() {
 }
 
 function scrollRow(id, dir) {
-  document.getElementById(id).scrollBy({ left: dir * 540, behavior: 'smooth' });
+  const el = document.getElementById(id);
+  if (el) el.scrollBy({ left: dir * 540, behavior: 'smooth' });
 }
 
-/* ─── WATCHLIST ─── */
+function scrollTrend(dir) {
+  const el = document.getElementById('trend-row');
+  if (el) el.scrollBy({ left: dir * 580, behavior: 'smooth' });
+}
+
+/* ─── PLATFORMS DATA ─── */
+const PLATFORMS_DATA = [
+  {
+    id: 'netflix', name: 'Netflix', color: '#e50914', icon: 'fa-solid fa-n',
+    movieLensIds: [109487, 164179, 2571, 79132, 58559, 1], // Interstellar, Arrival, Matrix, Inception, Dark Knight, Toy Story
+    movies: [MOVIES[6], MOVIES[7], MOVIES[8], MOVIES[11], MOVIES[3], MOVIES[1]],
+    series: [
+      {id: 101, title: "Stranger Things", year: "2016–2025", type: "series", genre: "Sci-Fi · Horror", rating: "8.7", poster: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&q=80"},
+      {id: 102, title: "The Crown", year: "2016–2023", type: "series", genre: "Drama · History", rating: "8.1", poster: "https://images.unsplash.com/photo-1580130732478-4e339fb33746?w=400&q=80"},
+      {id: 103, title: "Squid Game", year: "2021–", type: "series", genre: "Thriller · Drama", rating: "8.0", poster: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80"},
+      {id: 104, title: "Wednesday", year: "2022–", type: "series", genre: "Comedy · Horror", rating: "7.1", poster: "https://images.unsplash.com/photo-1509248961158-e54f6934749c?w=400&q=80"},
+      {id: 105, title: "Ozark", year: "2017–2022", type: "series", genre: "Crime · Drama", rating: "8.4", poster: "https://images.unsplash.com/photo-1518399681705-1c1a55e5e883?w=400&q=80"},
+      {id: 106, title: "Black Mirror", year: "2011–", type: "series", genre: "Sci-Fi · Thriller", rating: "8.2", poster: "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=400&q=80"},
+    ]
+  },
+  {
+    id: 'prime', name: 'Prime Video', color: '#00a8e0', icon: 'fa-brands fa-amazon',
+    movieLensIds: [480, 296, 2959, 356, 593, 1704], // Jurassic Park, Pulp Fiction, Fight Club, Forrest Gump, Silence of the Lambs, Good Will Hunting
+    movies: [MOVIES[1], MOVIES[5], MOVIES[11], MOVIES[3], MOVIES[4], MOVIES[9]],
+    series: [
+      {id: 201, title: "The Boys", year: "2019–", type: "series", genre: "Action · Satire", rating: "8.7", poster: "https://images.unsplash.com/photo-1635863138275-d9b33299680b?w=400&q=80"},
+      {id: 202, title: "Rings of Power", year: "2022–", type: "series", genre: "Fantasy · Adventure", rating: "6.9", poster: "https://images.unsplash.com/photo-1518709766631-a6a7f45921c3?w=400&q=80"},
+      {id: 203, title: "Fleabag", year: "2016–2019", type: "series", genre: "Comedy · Drama", rating: "8.7", poster: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80"},
+      {id: 204, title: "Reacher", year: "2022–", type: "series", genre: "Action · Thriller", rating: "8.0", poster: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=400&q=80"},
+      {id: 205, title: "Mr. Robot", year: "2015–2019", type: "series", genre: "Thriller · Drama", rating: "8.5", poster: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=400&q=80"},
+    ]
+  },
+  {
+    id: 'appletv', name: 'Apple TV+', color: '#a2aaad', icon: 'fa-brands fa-apple',
+    movieLensIds: [924, 260, 4993, 7361, 50, 1198], // 2001, Star Wars IV, Lord of the Rings, Eternal Sunshine, Usual Suspects, Raiders of the Lost Ark
+    movies: [MOVIES[4], MOVIES[0], MOVIES[5], MOVIES[2], MOVIES[10]],
+    series: [
+      {id: 301, title: "Severance", year: "2022–", type: "series", genre: "Sci-Fi · Mystery", rating: "8.7", poster: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&q=80"},
+      {id: 302, title: "Ted Lasso", year: "2020–", type: "series", genre: "Comedy · Sports", rating: "8.8", poster: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400&q=80"},
+      {id: 303, title: "The Morning Show", year: "2019–", type: "series", genre: "Drama", rating: "7.9", poster: "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&q=80"},
+      {id: 304, title: "Slow Horses", year: "2022–", type: "series", genre: "Thriller · Spy", rating: "8.1", poster: "https://images.unsplash.com/photo-1585776245991-cf89dd7fc73a?w=400&q=80"},
+    ]
+  },
+  {
+    id: 'disney', name: 'Disney+', color: '#113ccf', icon: 'fa-solid fa-star',
+    movieLensIds: [364, 588, 595, 6377, 4896, 2], // Lion King, Aladdin, Beauty and the Beast, Finding Nemo, Monsters Inc., Jumanji
+    movies: [MOVIES[3], MOVIES[0], MOVIES[7], MOVIES[11], MOVIES[1]],
+    series: [
+      {id: 401, title: "Andor", year: "2022–", type: "series", genre: "Sci-Fi · Drama", rating: "8.4", poster: "https://images.unsplash.com/photo-1534809027769-b00d750a6bac?w=400&q=80"},
+      {id: 402, title: "The Mandalorian", year: "2019–", type: "series", genre: "Sci-Fi · Western", rating: "8.7", poster: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=400&q=80"},
+      {id: 403, title: "Loki", year: "2021–", type: "series", genre: "Superhero · Comedy", rating: "8.2", poster: "https://images.unsplash.com/photo-1446776877081-d282a0f896e2?w=400&q=80"},
+      {id: 404, title: "What If...?", year: "2021–", type: "series", genre: "Animated · Sci-Fi", rating: "7.4", poster: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=400&q=80"},
+    ]
+  },
+  {
+    id: 'max', name: 'Max', color: '#002be0', icon: 'fa-solid fa-m',
+    movieLensIds: [318, 858, 58559, 912, 919, 50, 1198], // Shawshank, Godfather, Dark Knight, Casablanca, Citizen Kane, Usual Suspects, Raiders of the Lost Ark
+    movies: [MOVIES[0], MOVIES[2], MOVIES[7], MOVIES[10], MOVIES[8], MOVIES[9]],
+    series: [
+      {id: 501, title: "The Last of Us", year: "2023–", type: "series", genre: "Drama · Horror", rating: "8.8", poster: "https://images.unsplash.com/photo-1520209268518-aec60b8bb5ca?w=400&q=80"},
+      {id: 502, title: "House of the Dragon", year: "2022–", type: "series", genre: "Fantasy · Drama", rating: "8.5", poster: "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=400&q=80"},
+      {id: 503, title: "Succession", year: "2018–2023", type: "series", genre: "Drama · Comedy", rating: "8.9", poster: "https://images.unsplash.com/photo-1549032305-e816fabf0dd2?w=400&q=80"},
+      {id: 504, title: "True Detective", year: "2014–", type: "series", genre: "Crime · Mystery", rating: "8.9", poster: "https://images.unsplash.com/photo-1542261777448-23d2a9e529b2?w=400&q=80"},
+      {id: 505, title: "Euphoria", year: "2019–", type: "series", genre: "Drama", rating: "7.9", poster: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=400&q=80"},
+    ]
+  },
+  {
+    id: 'mubi', name: 'MUBI', color: '#45a0ff', icon: 'fa-solid fa-film',
+    movieLensIds: [1208, 904, 908, 4973, 5618, 924], // Apocalypse Now, Rear Window, Vertigo, Amelie, Spirited Away, 2001
+    movies: [MOVIES[5], MOVIES[9], MOVIES[10], MOVIES[2], MOVIES[6], MOVIES[3]],
+    series: [
+      {id: 601, title: "Pachinko", year: "2022–", type: "series", genre: "Drama · History", rating: "8.4", poster: "https://images.unsplash.com/photo-1570168007204-dfb528c6958f?w=400&q=80"},
+      {id: 602, title: "Irma Vep", year: "2022", type: "series", genre: "Drama · Comedy", rating: "7.7", poster: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=400&q=80"},
+      {id: 603, title: "The Affair", year: "2014–2019", type: "series", genre: "Drama · Romance", rating: "7.7", poster: "https://images.unsplash.com/photo-1518399681705-1c1a55e5e883?w=400&q=80"},
+    ]
+  }
+];
+
+/* ─── PLATFORM BROWSER WIRING ─── */
+function buildPlatforms() {
+  const tabsEl   = document.getElementById('plat-tabs');
+  const panelsEl = document.getElementById('plat-panels');
+  if (!tabsEl || !panelsEl) return;
+
+  tabsEl.innerHTML = '';
+  panelsEl.innerHTML = '';
+
+  PLATFORMS_DATA.forEach((plat, idx) => {
+    // Tab
+    const tab = document.createElement('button');
+    tab.className = 'plat-tab' + (plat.id === activePlatform ? ' active' : '');
+    tab.dataset.id = plat.id;
+    tab.innerHTML = `<i class="${plat.icon}" style="color:${plat.color}"></i>${plat.name}`;
+    tab.onclick = () => { playClick(); switchPlatform(plat.id); };
+    tabsEl.appendChild(tab);
+
+    // Panel
+    const panel = document.createElement('div');
+    panel.className = 'platform-panel' + (plat.id === activePlatform ? ' active' : '');
+    panel.id = 'panel-' + plat.id;
+    panel.innerHTML = `
+      <div class="plat-wrap" id="pw-${plat.id}">
+        <div class="plat-arr L" onclick="scrollPlat('${plat.id}',-1)"><i class="fa-solid fa-chevron-left"></i></div>
+        <div class="plat-row" id="pr-${plat.id}"></div>
+        <div class="plat-arr R" onclick="scrollPlat('${plat.id}',1)"><i class="fa-solid fa-chevron-right"></i></div>
+      </div>`;
+    panelsEl.appendChild(panel);
+
+    // Build initial cards
+    renderPlatCards(plat.id, activeType);
+  });
+}
+
+function renderPlatCards(platId, type) {
+  const plat = PLATFORMS_DATA.find(p => p.id === platId);
+  if (!plat) return;
+  const row = document.getElementById('pr-' + platId);
+  if (!row) return;
+  row.innerHTML = '';
+
+  if (type === 'series') {
+    plat.series.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'plat-card';
+      card.dataset.id = item.id;
+      card.innerHTML = `
+        <img src="${item.poster}" alt="${item.title}" loading="lazy"/>
+        <div class="plat-card-overlay"></div>
+        <div class="plat-card-badge badge-series">Series</div>
+        <div class="plat-card-info">
+          <div class="plat-card-title">${item.title}</div>
+          <div class="plat-card-meta">${item.year} · ${item.genre} · ★ ${item.rating}</div>
+          <div class="plat-card-actions">
+            <button class="pca-btn play"><i class="fa-solid fa-circle-info" style="font-size:9px"></i> Details</button>
+            <button class="pca-btn add"><i class="fa-solid fa-plus" style="font-size:9px"></i> Add</button>
+          </div>
+        </div>`;
+      
+      const handlePlay = (e) => { e.stopPropagation(); openModal(item); };
+      const handleAdd = (e) => {
+        e.stopPropagation();
+        toggleWatchlist(item);
+      };
+      
+      card.addEventListener('click', handlePlay);
+      card.querySelector('.pca-btn.play').addEventListener('click', handlePlay);
+      card.querySelector('.pca-btn.add').addEventListener('click', handleAdd);
+      
+      row.appendChild(card);
+    });
+  } else {
+    // Movies
+    if (movieLensData.loaded) {
+      plat.movieLensIds.forEach(movieId => {
+        const card = document.createElement('div');
+        card.className = 'plat-card';
+        card.dataset.id = movieId;
+        
+        const movie = movieLensData.movies[movieId];
+        const cleanTitle = movie ? movie.title.replace(/\s\(\d{4}\)$/, '') : `MovieLens #${movieId}`;
+        const year = movie ? movie.title.match(/\((\d{4})\)$/)?.[1] || 'N/A' : 'N/A';
+        const genresList = movie ? movie.genres.replace(/\|/g, ' · ') : 'Drama';
+        const match = calculateMatchScore(movieId);
+        
+        card.innerHTML = `
+          <img class="lazy-poster" src="https://images.unsplash.com/photo-1549032305-e816fabf0dd2?w=400&q=80" alt="${cleanTitle}" style="opacity: 0.35; transition: opacity 0.5s var(--smooth)"/>
+          <div class="plat-card-overlay"></div>
+          <div class="plat-card-badge badge-movie">Movie</div>
+          <div class="plat-card-info">
+            <div class="plat-card-title">${cleanTitle}</div>
+            <div class="plat-card-meta">${year} · ${genresList} · ★ ...</div>
+            <div class="plat-card-actions">
+              <button class="pca-btn play"><i class="fa-solid fa-circle-info" style="font-size:9px"></i> Details</button>
+              <button class="pca-btn add"><i class="fa-solid fa-plus" style="font-size:9px"></i> Add</button>
+            </div>
+          </div>`;
+          
+        let resolvedDetails = null;
+        const playBtn = card.querySelector('.pca-btn.play');
+        const addBtn = card.querySelector('.pca-btn.add');
+        
+        const handleOpen = (e) => {
+          if (e) e.stopPropagation();
+          if (resolvedDetails) openModal(resolvedDetails);
+        };
+        const handleAdd = (e) => {
+          if (e) e.stopPropagation();
+          toggleWatchlist(resolvedDetails || fallbackMock);
+        };
+        
+        card.addEventListener('click', () => handleOpen(null));
+        playBtn.addEventListener('click', e => handleOpen(e));
+        addBtn.addEventListener('click', handleAdd);
+        
+        const fallbackMock = {
+          id: movieId,
+          title: cleanTitle,
+          year: year,
+          match: match,
+          rating: "...",
+          runtime: "N/A",
+          genre: genresList,
+          synopsis: "Loading details from TMDb...",
+          poster: "https://images.unsplash.com/photo-1549032305-e816fabf0dd2?w=400&q=80",
+          backdrop: "https://images.unsplash.com/photo-1549032305-e816fabf0dd2?w=1200&q=85",
+          platforms: ["Streaming"],
+          reasons: ["Popular Choice"],
+          cast: []
+        };
+        
+        card.addEventListener('mouseenter', () => schedulePopup(resolvedDetails || fallbackMock, card));
+        card.addEventListener('mouseleave', () => cancelPopup());
+        
+        fetchTMDBDetails(movieId).then(details => {
+          if (!details) return;
+          resolvedDetails = details;
+          
+          const img = card.querySelector('.lazy-poster');
+          if (img) {
+            img.src = details.poster;
+            img.style.opacity = 1;
+          }
+          const metaEl = card.querySelector('.plat-card-meta');
+          if (metaEl) {
+            metaEl.textContent = `${details.year} · ${details.genre} · ★ ${details.rating}`;
+          }
+          
+          if (currentPopupMovie && currentPopupMovie.id === movieId) {
+            showPopup(details, card);
+          }
+        });
+        
+        row.appendChild(card);
+      });
+    } else {
+      plat.movies.forEach(movie => {
+        const card = document.createElement('div');
+        card.className = 'plat-card';
+        card.dataset.id = movie.id;
+        card.innerHTML = `
+          <img src="${movie.poster}" alt="${movie.title}" loading="lazy"/>
+          <div class="plat-card-overlay"></div>
+          <div class="plat-card-badge badge-movie">Movie</div>
+          <div class="plat-card-info">
+            <div class="plat-card-title">${movie.title}</div>
+            <div class="plat-card-meta">${movie.year} · ${movie.genre} · ★ ${movie.rating}</div>
+            <div class="plat-card-actions">
+              <button class="pca-btn play"><i class="fa-solid fa-circle-info" style="font-size:9px"></i> Details</button>
+              <button class="pca-btn add"><i class="fa-solid fa-plus" style="font-size:9px"></i> Add</button>
+            </div>
+          </div>`;
+          
+        const handleOpen = (e) => {
+          if (e) e.stopPropagation();
+          openModal(movie);
+        };
+        const handleAdd = (e) => {
+          if (e) e.stopPropagation();
+          toggleWatchlist(movie);
+        };
+        
+        card.addEventListener('click', () => handleOpen(null));
+        card.querySelector('.pca-btn.play').addEventListener('click', e => handleOpen(e));
+        card.querySelector('.pca-btn.add').addEventListener('click', handleAdd);
+        
+        card.addEventListener('mouseenter', () => schedulePopup(movie, card));
+        card.addEventListener('mouseleave', () => cancelPopup());
+        
+        row.appendChild(card);
+      });
+    }
+  }
+}
+
+function switchPlatform(platId) {
+  activePlatform = platId;
+  document.querySelectorAll('.plat-tab').forEach(t => t.classList.toggle('active', t.dataset.id === platId));
+  document.querySelectorAll('.platform-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + platId));
+}
+
+function setType(type) {
+  activeType = type;
+  const pillMovies = document.getElementById('pill-movies');
+  const pillSeries = document.getElementById('pill-series');
+  if (pillMovies) pillMovies.classList.toggle('active', type === 'movies');
+  if (pillSeries) pillSeries.classList.toggle('active', type === 'series');
+  playClick();
+  PLATFORMS_DATA.forEach(p => renderPlatCards(p.id, type));
+}
+
+function scrollPlat(platId, dir) {
+  const el = document.getElementById('pr-' + platId);
+  if (el) el.scrollBy({ left: dir * 600, behavior: 'smooth' });
+}
+
+/* ─── WATCHLIST LOGIC ─── */
+let roulettePromptDismissed = false;
+
+function toggleWatchlist(movie) {
+  const index = watchlist.findIndex(m => m.id === movie.id);
+  if (index !== -1) {
+    watchlist.splice(index, 1);
+  } else {
+    watchlist.push(movie);
+    const badge = document.getElementById('wl-count');
+    if (badge) {
+      badge.classList.add('bump');
+      setTimeout(() => badge.classList.remove('bump'), 450);
+    }
+  }
+  localStorage.setItem('user_watchlist', JSON.stringify(watchlist));
+  updateWatchlistUI();
+  updateWLCount();
+  playClick();
+  syncWatchlistButtons();
+}
+
 function addToWatchlist(movie, triggerEl) {
   if (watchlist.find(m => m.id === movie.id)) return;
   watchlist.push(movie);
+  
+  // Persist to localStorage
+  localStorage.setItem('user_watchlist', JSON.stringify(watchlist));
+  
   updateWatchlistUI();
   updateWLCount();
+  playClick();
 
   const badge = document.getElementById('wl-count');
-  badge.classList.add('bump');
-  setTimeout(() => badge.classList.remove('bump'), 450);
-
-  if (triggerEl) {
-    triggerEl.classList.add('added');
-    triggerEl.innerHTML = '<i class="fa-solid fa-check"></i>';
-    setTimeout(() => {
-      triggerEl.classList.remove('added');
-      triggerEl.innerHTML = '<i class="fa-solid fa-plus"></i>';
-    }, 1600);
+  if (badge) {
+    badge.classList.add('bump');
+    setTimeout(() => badge.classList.remove('bump'), 450);
   }
+  syncWatchlistButtons();
 }
 
 function removeFromWatchlist(id) {
   watchlist = watchlist.filter(m => m.id !== id);
+  localStorage.setItem('user_watchlist', JSON.stringify(watchlist));
   updateWatchlistUI();
   updateWLCount();
+  playClick();
+  syncWatchlistButtons();
+}
+
+function syncWatchlistButtons() {
+  // 1. Sync all .card-quick-add buttons on the page
+  document.querySelectorAll('.card-quick-add').forEach(btn => {
+    const mid = parseInt(btn.dataset.id || btn.getAttribute('data-id'));
+    if (!isNaN(mid)) {
+      const isAdded = watchlist.some(m => m.id === mid);
+      btn.classList.toggle('added', isAdded);
+      btn.innerHTML = isAdded 
+        ? '<i class="fa-solid fa-check" style="font-size:9px"></i>' 
+        : '<i class="fa-solid fa-plus" style="font-size:9px"></i>';
+      btn.title = isAdded ? 'Remove from Watchlist' : 'Add to Watchlist';
+    }
+  });
+
+  // 2. Sync all .pca-btn.add buttons on platform cards (.plat-card)
+  document.querySelectorAll('.plat-card').forEach(card => {
+    const mid = parseInt(card.dataset.id || card.getAttribute('data-id'));
+    if (!isNaN(mid)) {
+      const isAdded = watchlist.some(m => m.id === mid);
+      const btn = card.querySelector('.pca-btn.add');
+      if (btn) {
+        btn.classList.toggle('added', isAdded);
+        btn.innerHTML = isAdded 
+          ? '<i class="fa-solid fa-check" style="font-size:9px"></i> In List' 
+          : '<i class="fa-solid fa-plus" style="font-size:9px"></i> Add';
+        btn.title = isAdded ? 'Remove from Watchlist' : 'Add to Watchlist';
+      }
+    }
+  });
+
+  // 3. Sync floating preview popup button (#pp-add)
+  const ppAdd = document.getElementById('pp-add');
+  if (ppAdd && currentPopupMovie) {
+    const isAdded = watchlist.some(m => m.id === currentPopupMovie.id);
+    ppAdd.classList.toggle('added', isAdded);
+    ppAdd.innerHTML = isAdded 
+      ? '<i class="fa-solid fa-check" style="font-size:10px"></i>' 
+      : '<i class="fa-solid fa-plus" style="font-size:10px"></i>';
+    ppAdd.title = isAdded ? 'Remove from Watchlist' : 'Add to Watchlist';
+  }
+
+  // 4. Sync details modal button (#m-add-wl-new)
+  const wlBtnNew = document.getElementById('m-add-wl-new');
+  if (wlBtnNew && currentModalMovie) {
+    const isAdded = watchlist.some(m => m.id === currentModalMovie.id);
+    wlBtnNew.classList.toggle('added', isAdded);
+    wlBtnNew.innerHTML = isAdded 
+      ? '<i class="fa-solid fa-check" style="font-size:10px;margin-right:6px"></i>In Watchlist' 
+      : '<i class="fa-solid fa-plus" style="font-size:10px;margin-right:6px"></i>Add to Watchlist';
+    wlBtnNew.title = isAdded ? 'Remove from Watchlist' : 'Add to Watchlist';
+  }
+
+  // 5. Sync hero section watchlist button (#hero-wl-btn)
+  const heroWlBtn = document.getElementById('hero-wl-btn');
+  if (heroWlBtn && currentHeroMovie) {
+    const isAdded = watchlist.some(m => m.id === currentHeroMovie.id);
+    heroWlBtn.classList.toggle('added', isAdded);
+    heroWlBtn.innerHTML = isAdded ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-plus"></i>';
+    heroWlBtn.title = isAdded ? 'Remove from Watchlist' : 'Add to Watchlist';
+  }
+
+  // 6. Sync surprise pick watchlist button (#s-add-btn)
+  const sAddBtn = document.getElementById('s-add-btn');
+  if (sAddBtn && currentSurpriseMovie) {
+    const isAdded = watchlist.some(m => m.id === currentSurpriseMovie.id);
+    sAddBtn.classList.toggle('added', isAdded);
+    sAddBtn.innerHTML = isAdded 
+      ? '<i class="fa-solid fa-check" style="font-size:11px;margin-right:6px"></i>In Watchlist' 
+      : '<i class="fa-solid fa-plus" style="font-size:11px;margin-right:6px"></i>Watchlist';
+    sAddBtn.title = isAdded ? 'Remove from Watchlist' : 'Add to Watchlist';
+  }
 }
 
 function updateWLCount() {
   const badge = document.getElementById('wl-count');
+  if (!badge) return;
   const count = watchlist.length;
   badge.textContent = count;
-  // Bug 6 fix: hide badge when empty so "0" never shows in the nav
+  // Hide badge when empty
   badge.style.display = count > 0 ? 'flex' : 'none';
 }
 
 function updateWatchlistUI() {
   const strip = document.getElementById('wl-strip');
   const empty = document.getElementById('wl-empty');
-  const spinBtn = document.getElementById('spin-btn');
-  const drumInner = document.getElementById('drum-inner');
+  const prompt = document.getElementById('roulette-prompt');
+  const roulette = document.getElementById('roulette-wrap');
+  const rpCount = document.getElementById('rp-count');
+  if (!strip) return;
 
   strip.querySelectorAll('.wl-item').forEach(el => el.remove());
 
   if (watchlist.length === 0) {
-    empty.style.display = 'flex';
-    spinBtn.disabled = true;
-    drumInner.innerHTML = '';
+    if (empty) empty.style.display = 'flex';
+    if (prompt) prompt.classList.remove('show');
+    if (roulette) roulette.classList.remove('open');
+    roulettePromptDismissed = false;
     resetWinner();
     return;
   }
-  empty.style.display = 'none';
-  spinBtn.disabled = false;
+  
+  if (empty) empty.style.display = 'none';
+
+  if (rpCount) rpCount.textContent = watchlist.length;
+
+  if (!roulettePromptDismissed && roulette && !roulette.classList.contains('open')) {
+    if (prompt) prompt.classList.add('show');
+  }
 
   watchlist.forEach(movie => {
     const item = document.createElement('div');
@@ -378,15 +989,49 @@ function updateWatchlistUI() {
   });
 
   buildDrum();
+}
+
+function openRoulette() {
+  playClick();
+  const prompt = document.getElementById('roulette-prompt');
+  const roulette = document.getElementById('roulette-wrap');
+  if (prompt) prompt.classList.remove('show');
+  if (roulette) {
+    roulette.classList.add('open');
+    roulette.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+function closeRoulette() {
+  playClick();
+  const roulette = document.getElementById('roulette-wrap');
+  const prompt = document.getElementById('roulette-prompt');
+  if (roulette) roulette.classList.remove('open');
+  if (prompt) prompt.classList.add('show');
+  roulettePromptDismissed = false;
   resetWinner();
+}
+
+function dismissRoulette() {
+  playClick();
+  roulettePromptDismissed = true;
+  const prompt = document.getElementById('roulette-prompt');
+  if (prompt) prompt.classList.remove('show');
 }
 
 /* ─── DRUM ─── */
 function buildDrum() {
   const inner = document.getElementById('drum-inner');
+  if (!inner) return;
   inner.innerHTML = '';
+  
+  if (watchlist.length === 0) return;
+  
   const repeated = [];
-  while (repeated.length < Math.max(watchlist.length * 4, 20)) repeated.push(...watchlist);
+  while (repeated.length < Math.max(watchlist.length * 5, 25)) {
+    repeated.push(...watchlist);
+  }
+  
   repeated.forEach(m => {
     const card = document.createElement('div');
     card.className = 'drum-card';
@@ -404,18 +1049,25 @@ function spinRoulette() {
 
   const btn = document.getElementById('spin-btn');
   const inner = document.getElementById('drum-inner');
-  btn.disabled = true;
-  btn.classList.add('spinning');
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add('spinning');
+  }
+
+  playWhoosh();
+  playSpinAccel();
 
   const winnerIdx = Math.floor(Math.random() * watchlist.length);
   const winner = watchlist[winnerIdx];
 
-  inner.style.transition = 'none';
-  inner.style.transform = 'translateX(0)';
+  if (inner) {
+    inner.style.transition = 'none';
+    inner.style.transform = 'translateX(0)';
+  }
   buildDrum();
 
   const CARD_W = 112 + 10;
-  const cards = inner.querySelectorAll('.drum-card');
+  const cards = inner ? inner.querySelectorAll('.drum-card') : [];
   const totalCards = cards.length;
 
   let targetCardIdx = -1;
@@ -430,22 +1082,33 @@ function spinRoulette() {
   const overshoot = targetX - CARD_W * 5;
 
   requestAnimationFrame(() => {
-    inner.style.transition = 'transform 2.6s cubic-bezier(.12,.7,.18,1)';
-    inner.style.transform = `translateX(${overshoot}px)`;
+    if (inner) {
+      inner.style.transition = 'transform 2.6s cubic-bezier(.12,.7,.18,1)';
+      inner.style.transform = `translateX(${overshoot}px)`;
+    }
   });
 
   setTimeout(() => {
-    inner.style.transition = 'transform 0.85s cubic-bezier(.34,1.1,.64,1)';
-    inner.style.transform = `translateX(${targetX}px)`;
+    if (inner) {
+      inner.style.transition = 'transform 0.85s cubic-bezier(.34,1.1,.64,1)';
+      inner.style.transform = `translateX(${targetX}px)`;
+    }
+    setTimeout(playTick, 200);
+    setTimeout(playTick, 500);
   }, 2620);
 
   setTimeout(() => {
-    inner.querySelectorAll('.drum-card').forEach((c, i) => {
-      if (i === targetCardIdx) c.classList.add('winner');
-    });
+    if (inner) {
+      inner.querySelectorAll('.drum-card').forEach((c, i) => {
+        if (i === targetCardIdx) c.classList.add('winner');
+      });
+    }
     showWinner(winner);
-    btn.disabled = false;
-    btn.classList.remove('spinning');
+    playWin();
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('spinning');
+    }
     spinLock = false;
     confettiBurst();
   }, 3580);
@@ -453,6 +1116,7 @@ function spinRoulette() {
 
 function showWinner(movie) {
   const rev = document.getElementById('winner-reveal');
+  if (!rev) return;
   document.getElementById('winner-name').textContent = movie.title;
   document.getElementById('winner-meta').textContent = `${movie.year} · ${movie.genre} · ★ ${movie.rating}`;
   document.getElementById('winner-open').onclick = () => openModal(movie);
@@ -460,26 +1124,30 @@ function showWinner(movie) {
 }
 
 function resetWinner() {
-  document.getElementById('winner-reveal').classList.remove('show');
-  document.getElementById('drum-inner').querySelectorAll('.drum-card').forEach(c => c.classList.remove('winner'));
+  const rev = document.getElementById('winner-reveal');
+  if (rev) rev.classList.remove('show');
+  const inner = document.getElementById('drum-inner');
+  if (inner) {
+    inner.querySelectorAll('.drum-card').forEach(c => c.classList.remove('winner'));
+  }
 }
 
 /* ─── CONFETTI ─── */
 function confettiBurst() {
   const colors = ['#f5c518','#7c3aed','#a78bfa','#fbbf24','#f472b6'];
-  for (let i = 0; i < 36; i++) {
+  for (let i = 0; i < 38; i++) {
     const dot = document.createElement('div');
     dot.className = 'confetti-dot';
     dot.style.cssText = `
       left:${Math.random()*100}vw;top:${38+Math.random()*22}vh;
-      background:${colors[Math.floor(Math.random()*colors.length)]};
+      background:${colors[i%colors.length]};
       animation-delay:${Math.random()*0.5}s;
       animation-duration:${1.3+Math.random()*.7}s;
       transform:rotate(${Math.random()*360}deg);
       width:${5+Math.random()*9}px;height:${5+Math.random()*9}px;
     `;
     document.body.appendChild(dot);
-    setTimeout(() => dot.remove(), 2500);
+    setTimeout(() => dot.remove(), 2600);
   }
 }
 
@@ -488,8 +1156,8 @@ let lastSurprise = -1;
 function surpriseMe() {
   const orb = document.getElementById('surprise-btn');
   const result = document.getElementById('surprise-result');
-  orb.style.transform = 'scale(0.86)';
-  setTimeout(() => { orb.style.transform = ''; }, 200);
+  if (orb) orb.style.transform = 'scale(0.82)';
+  setTimeout(() => { if (orb) orb.style.transform = ''; }, 200);
 
   let movieId;
   if (movieLensData.loaded) {
@@ -507,7 +1175,7 @@ function surpriseMe() {
     movieId = MOVIES[idx].id;
   }
 
-  result.classList.remove('show');
+  if (result) result.classList.remove('show');
   fetchTMDBDetails(movieId).then(movie => {
     if (!movie) return;
     setTimeout(() => {
@@ -517,7 +1185,7 @@ function surpriseMe() {
       document.getElementById('s-synopsis').textContent = movie.synopsis.slice(0, 115) + '…';
       document.getElementById('s-modal-btn').onclick = () => openModal(movie);
       document.getElementById('s-add-btn').onclick = () => addToWatchlist(movie, document.getElementById('s-add-btn'));
-      result.classList.add('show');
+      if (result) result.classList.add('show');
     }, 220);
   });
 }
@@ -539,134 +1207,180 @@ function highlightStars(rating) {
 /* ─── MODAL CONTROLS ─── */
 function openModal(movie) {
   currentModalMovie = movie;
-  document.getElementById('m-backdrop').src = movie.backdrop;
-  document.getElementById('m-poster').src = movie.poster;
-  document.getElementById('m-chip').innerHTML = `<i class="fa-solid fa-circle-check" style="font-size:10px"></i> ${movie.match}% Match`;
-  document.getElementById('m-title').textContent = movie.title;
-  document.getElementById('m-year').textContent = `${movie.year} · ${movie.runtime}`;
-  document.getElementById('m-rating').textContent = `★ ${movie.rating}`;
-  document.getElementById('m-runtime').textContent = movie.runtime;
-  document.getElementById('m-genre').textContent = movie.genre;
-  document.getElementById('m-synopsis').textContent = movie.synopsis;
-
-  document.getElementById('m-platforms').innerHTML = movie.platforms.map(p =>
-    `<span class="plat-badge"><i class="fa-solid fa-circle-play" style="font-size:9px;color:var(--y)"></i>${p}</span>`
-  ).join('');
-
-  document.getElementById('m-reasons').innerHTML = movie.reasons.map(r =>
-    `<span class="ai-pill"><i class="fa-solid fa-bolt" style="font-size:9px"></i>${r}</span>`
-  ).join('');
-
-  document.getElementById('m-cast').innerHTML = movie.cast.map(c => `
-    <div class="m-cast-person">
-      <img src="${c.img}" alt="${c.name}"/>
-      <span>${c.name}</span>
-    </div>
-  `).join('');
-
-  if (movieLensData.loaded) {
-    const list = Object.values(movieLensData.movies)
-      .filter(m => m.movieId !== movie.id && m.genres.split('|').some(g => movie.genre.includes(g)))
-      .slice(0, 8);
+  hidePopup();
+  
+  const isSeries = movie.type === 'series';
+  
+  document.getElementById('m-backdrop').src = movie.backdrop || movie.poster;
+  
+  if (isSeries) {
+    document.getElementById('m-chip').innerHTML = `<i class="fa-solid fa-tv" style="font-size:10px"></i> Popular Series`;
+    document.getElementById('m-title').textContent = movie.title;
+    document.getElementById('m-year').textContent = `${movie.year}`;
+    document.getElementById('m-rating').textContent = `★ ${movie.rating}`;
+    document.getElementById('m-runtime').textContent = "Series";
+    document.getElementById('m-genre').textContent = movie.genre;
+    document.getElementById('m-synopsis').textContent = `${movie.title} is a hit series in the ${movie.genre} genre. Watch all seasons now! Rated ${movie.rating}/10.`;
     
-    document.getElementById('m-similar').innerHTML = list.map(m => `
-      <div class="mini" data-similar-id="${m.movieId}">
-        <img src="https://images.unsplash.com/photo-1549032305-e816fabf0dd2?w=90&q=80" alt="${m.title}" loading="lazy"/>
-        <div class="mini-title">${m.title.replace(/\s\(\d{4}\)$/, '')}</div>
+    document.getElementById('m-platforms').innerHTML = `<span class="plat-badge"><i class="fa-solid fa-circle-play" style="font-size:9px;color:var(--y)"></i>Streaming</span>`;
+    document.getElementById('m-reasons').innerHTML = `<span class="ai-pill"><i class="fa-solid fa-bolt" style="font-size:9px"></i>Trending</span>`;
+    document.getElementById('m-cast').innerHTML = `
+      <div class="m-cast-person">
+        <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&q=80" alt="Actor"/>
+        <span>Lead Actor</span>
+      </div>`;
+    
+    document.getElementById('m-similar').innerHTML = '';
+    
+    // Hide stars rating and trailer
+    const ratingBox = document.querySelector('.user-rating-box');
+    if (ratingBox) ratingBox.style.display = 'none';
+    
+    const videoContainer = document.getElementById('m-video-container');
+    if (videoContainer) videoContainer.style.display = 'none';
+    
+    const playBtn = document.getElementById('m-play-btn');
+    if (playBtn) playBtn.style.display = 'none';
+    
+  } else {
+    // Normal Movie details
+    const ratingBox = document.querySelector('.user-rating-box');
+    if (ratingBox) ratingBox.style.display = 'flex';
+    
+    document.getElementById('m-chip').innerHTML = `<i class="fa-solid fa-circle-check" style="font-size:10px"></i> ${movie.match}% Match`;
+    document.getElementById('m-title').textContent = movie.title;
+    document.getElementById('m-year').textContent = `${movie.year} · ${movie.runtime}`;
+    document.getElementById('m-rating').textContent = `★ ${movie.rating}`;
+    document.getElementById('m-runtime').textContent = movie.runtime;
+    document.getElementById('m-genre').textContent = movie.genre;
+    document.getElementById('m-synopsis').textContent = movie.synopsis;
+
+    document.getElementById('m-platforms').innerHTML = movie.platforms.map(p =>
+      `<span class="plat-badge"><i class="fa-solid fa-circle-play" style="font-size:9px;color:var(--y)"></i>${p}</span>`
+    ).join('');
+
+    document.getElementById('m-reasons').innerHTML = movie.reasons.map(r =>
+      `<span class="ai-pill"><i class="fa-solid fa-bolt" style="font-size:9px"></i>${r}</span>`
+    ).join('');
+
+    document.getElementById('m-cast').innerHTML = movie.cast.map(c => `
+      <div class="m-cast-person">
+        <img src="${c.img}" alt="${c.name}"/>
+        <span>${c.name}</span>
       </div>
     `).join('');
-    
-    list.forEach(m => {
-      fetchTMDBDetails(m.movieId).then(details => {
-        if (!details) return;
-        const img = document.querySelector(`[data-similar-id="${m.movieId}"] img`);
-        if (img) img.src = details.poster;
-        const el = document.querySelector(`[data-similar-id="${m.movieId}"]`);
-        if (el) el.onclick = () => openModal(details);
-      });
-    });
-  } else {
-    document.getElementById('m-similar').innerHTML = MOVIES
-      .filter(m => m.id !== movie.id).slice(0,8).map(m => `
-        <div class="mini" onclick="openModal(MOVIES.find(x=>x.id===${m.id}))">
-          <img src="${m.poster}" alt="${m.title}" loading="lazy"/>
-          <div class="mini-title">${m.title}</div>
+
+    if (movieLensData.loaded) {
+      const list = Object.values(movieLensData.movies)
+        .filter(m => m.movieId !== movie.id && m.genres.split('|').some(g => movie.genre.includes(g)))
+        .slice(0, 8);
+      
+      document.getElementById('m-similar').innerHTML = list.map(m => `
+        <div class="mini" data-similar-id="${m.movieId}">
+          <img src="https://images.unsplash.com/photo-1549032305-e816fabf0dd2?w=90&q=80" alt="${m.title}" loading="lazy"/>
+          <div class="mini-title">${m.title.replace(/\s\(\d{4}\)$/, '')}</div>
         </div>
       `).join('');
-  }
+      
+      list.forEach(m => {
+        fetchTMDBDetails(m.movieId).then(details => {
+          if (!details) return;
+          const img = document.querySelector(`[data-similar-id="${m.movieId}"] img`);
+          if (img) img.src = details.poster;
+          const el = document.querySelector(`[data-similar-id="${m.movieId}"]`);
+          if (el) el.onclick = () => openModal(details);
+        });
+      });
+    } else {
+      document.getElementById('m-similar').innerHTML = MOVIES
+        .filter(m => m.id !== movie.id).slice(0,8).map(m => `
+          <div class="mini" onclick="openModal(MOVIES.find(x=>x.id===${m.id}))">
+            <img src="${m.poster}" alt="${m.title}" loading="lazy"/>
+            <div class="mini-title">${m.title}</div>
+          </div>
+        `).join('');
+    }
 
-  // Set user stars
-  const userRatings = JSON.parse(localStorage.getItem('user_movie_ratings') || '{}');
-  const myRating = userRatings[movie.id] || 0;
-  highlightStars(myRating);
-  
-  const starsContainer = document.querySelector('.user-stars');
-  starsContainer.onmouseleave = () => {
-    const currentRatings = JSON.parse(localStorage.getItem('user_movie_ratings') || '{}');
-    highlightStars(currentRatings[movie.id] || 0);
-  };
-  
-  document.querySelectorAll('.user-stars i').forEach(star => {
-    star.onmouseenter = () => {
-      const val = parseInt(star.dataset.value);
-      highlightStars(val);
-    };
-    star.onclick = () => {
-      const val = parseInt(star.dataset.value);
-      const currentRatings = JSON.parse(localStorage.getItem('user_movie_ratings') || '{}');
-      if (currentRatings[movie.id] === val) {
-        delete currentRatings[movie.id];
-      } else {
-        currentRatings[movie.id] = val;
-      }
-      localStorage.setItem('user_movie_ratings', JSON.stringify(currentRatings));
-      highlightStars(currentRatings[movie.id] || 0);
-      if (movieLensData.loaded) {
-        initializeRecommender();
-        if (typeof initHero === 'function') initHero();
-      }
-    };
-  });
+    // Set user stars
+    const userRatings = JSON.parse(localStorage.getItem('user_movie_ratings') || '{}');
+    const myRating = userRatings[movie.id] || 0;
+    highlightStars(myRating);
+    
+    const starsContainer = document.querySelector('.user-stars');
+    if (starsContainer) {
+      starsContainer.onmouseleave = () => {
+        const currentRatings = JSON.parse(localStorage.getItem('user_movie_ratings') || '{}');
+        highlightStars(currentRatings[movie.id] || 0);
+      };
+    }
+    
+    document.querySelectorAll('.user-stars i').forEach(star => {
+      star.onmouseenter = () => {
+        const val = parseInt(star.dataset.value);
+        highlightStars(val);
+      };
+      star.onclick = () => {
+        const val = parseInt(star.dataset.value);
+        const currentRatings = JSON.parse(localStorage.getItem('user_movie_ratings') || '{}');
+        if (currentRatings[movie.id] === val) {
+          delete currentRatings[movie.id];
+        } else {
+          currentRatings[movie.id] = val;
+        }
+        localStorage.setItem('user_movie_ratings', JSON.stringify(currentRatings));
+        highlightStars(currentRatings[movie.id] || 0);
+        if (movieLensData.loaded) {
+          initializeRecommender();
+          if (typeof initHero === 'function') initHero();
+        }
+      };
+    });
 
-  // Play Trailer Config
-  const playBtn = document.getElementById('m-play-btn');
-  const videoContainer = document.getElementById('m-video-container');
-  const videoIframe = document.getElementById('m-video-iframe');
-  videoContainer.style.display = 'none';
-  videoIframe.src = '';
-  
-  if (movie.trailerKey) {
-    playBtn.style.display = 'inline-flex';
-    playBtn.onclick = () => {
-      videoIframe.src = `https://www.youtube.com/embed/${movie.trailerKey}?autoplay=1`;
-      videoContainer.style.display = 'block';
-      videoContainer.scrollIntoView({ behavior: 'smooth' });
-    };
-  } else {
-    playBtn.style.display = 'none';
+    // Play Trailer Config
+    const playBtn = document.getElementById('m-play-btn');
+    const videoContainer = document.getElementById('m-video-container');
+    const videoIframe = document.getElementById('m-video-iframe');
+    
+    if (videoContainer) videoContainer.style.display = 'none';
+    if (videoIframe) videoIframe.src = '';
+    
+    if (movie.trailerKey && playBtn) {
+      playBtn.style.display = 'inline-flex';
+      playBtn.onclick = () => {
+        if (videoIframe) videoIframe.src = `https://www.youtube.com/embed/${movie.trailerKey}?autoplay=1`;
+        if (videoContainer) {
+          videoContainer.style.display = 'block';
+          videoContainer.scrollIntoView({ behavior: 'smooth' });
+        }
+      };
+    } else if (playBtn) {
+      playBtn.style.display = 'none';
+    }
   }
 
   const wlBtnNew = document.getElementById('m-add-wl-new');
-  const alreadyIn = watchlist.find(x => x.id === movie.id);
-  
-  const updateWatchlistButton = (inWatchlist) => {
-    if (inWatchlist) {
-      wlBtnNew.textContent = 'In Watchlist';
-      wlBtnNew.classList.add('added');
-    } else {
-      wlBtnNew.textContent = 'Add to Watchlist';
-      wlBtnNew.classList.remove('added');
-    }
-  };
+  if (wlBtnNew) {
+    const alreadyIn = watchlist.find(x => x.id === movie.id);
+    
+    const updateWatchlistButton = (inWatchlist) => {
+      if (inWatchlist) {
+        wlBtnNew.textContent = 'In Watchlist';
+        wlBtnNew.classList.add('added');
+      } else {
+        wlBtnNew.textContent = 'Add to Watchlist';
+        wlBtnNew.classList.remove('added');
+      }
+    };
 
-  updateWatchlistButton(alreadyIn);
+    updateWatchlistButton(alreadyIn);
 
-  wlBtnNew.onclick = () => {
-    if (!watchlist.find(x => x.id === movie.id)) {
-      addToWatchlist(movie, null);
-      updateWatchlistButton(true);
-    }
-  };
+    wlBtnNew.onclick = () => {
+      if (!watchlist.find(x => x.id === movie.id)) {
+        addToWatchlist(movie, null);
+        updateWatchlistButton(true);
+      }
+    };
+  }
 
   document.getElementById('overlay').classList.add('on');
   document.body.style.overflow = 'hidden';
@@ -674,7 +1388,8 @@ function openModal(movie) {
 
 function closeModal() {
   document.getElementById('overlay').classList.remove('on');
-  document.getElementById('m-video-iframe').src = '';
+  const iframe = document.getElementById('m-video-iframe');
+  if (iframe) iframe.src = '';
   document.body.style.overflow = '';
 }
 
@@ -711,11 +1426,11 @@ function saveSettings() {
   }
   closeSettingsModal();
   
-  // Refresh data with new key
+  // Refresh cache and lists
   tmdbCache = {};
   buildTrending();
   renderRows();
-  // Bug 4 fix: also refresh the hero so it picks up the new API key
+  if (typeof buildPlatforms === 'function') buildPlatforms();
   if (typeof initHero === 'function') initHero();
 }
 
@@ -737,14 +1452,39 @@ function scrollToWatchlist() {
   document.getElementById('watchlist-section').scrollIntoView({ behavior: 'smooth' });
 }
 
-/* ─── NAVBAR SCROLL ─── */
+/* ─── INTERACTION & SCROLL NAVIGATION ─── */
+function initScrollspy() {
+  const sections = ['hero', 'trending-section', 'platforms-section', 'surprise-section', 'watchlist-section'];
+  const links = document.querySelectorAll('.nav-links a[data-section]');
+
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        links.forEach(a => a.classList.toggle('active', a.dataset.section === id));
+      }
+    });
+  }, { threshold: 0.25, rootMargin: '-62px 0px -40% 0px' });
+
+  sections.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) obs.observe(el);
+  });
+}
+
 window.addEventListener('scroll', () => {
-  document.getElementById('nav').classList.toggle('solid', window.scrollY > 60);
+  const nav = document.getElementById('nav');
+  if (nav) nav.classList.toggle('solid', window.scrollY > 60);
 }, { passive: true });
 
-/* ─── INTERSECTION OBSERVER ─── */
+/* ─── REVEAL ON SCROLL ─── */
 const io = new IntersectionObserver(entries => {
-  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('in');
+      io.unobserve(e.target);
+    }
+  });
 }, { threshold: 0.07 });
 document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 
@@ -761,14 +1501,16 @@ document.getElementById('search-input').addEventListener('input', function () {
   const countEl = document.getElementById('search-count');
   
   if (!q) {
-    searchSec.style.display = 'none';
+    if (searchSec) searchSec.style.display = 'none';
     return;
   }
   
+  if (!searchResults) return;
+  searchResults.innerHTML = '';
+  
   if (!movieLensData.loaded) {
-    searchResults.innerHTML = '';
     const matches = MOVIES.filter(m => m.title.toLowerCase().includes(q));
-    countEl.textContent = `${matches.length} found`;
+    if (countEl) countEl.textContent = `${matches.length} found`;
     if (matches.length === 0) {
       searchResults.innerHTML = '<div style="padding: 24px; color: var(--t3); font-size: 13px;">No movies found matching that query.</div>';
     } else {
@@ -776,7 +1518,7 @@ document.getElementById('search-input').addEventListener('input', function () {
         searchResults.appendChild(buildCard(m.id));
       });
     }
-    searchSec.style.display = 'block';
+    if (searchSec) searchSec.style.display = 'block';
     return;
   }
   
@@ -784,8 +1526,7 @@ document.getElementById('search-input').addEventListener('input', function () {
     .filter(m => m.title.toLowerCase().includes(q))
     .slice(0, 15);
     
-  searchResults.innerHTML = '';
-  countEl.textContent = `${matches.length} found`;
+  if (countEl) countEl.textContent = `${matches.length} found`;
   
   if (matches.length === 0) {
     searchResults.innerHTML = '<div style="padding: 24px; color: var(--t3); font-size: 13px;">No movies found matching that query.</div>';
@@ -795,7 +1536,7 @@ document.getElementById('search-input').addEventListener('input', function () {
     });
   }
   
-  searchSec.style.display = 'block';
+  if (searchSec) searchSec.style.display = 'block';
 });
 
 /* ─── DYNAMIC HERO SECTION ─── */
@@ -848,7 +1589,6 @@ function updateHeroUI(movie) {
     whyTag.innerHTML = `<i class="fa-solid fa-brain" style="font-size:10px;color:var(--vl)"></i> ${reasons.slice(0, 3).join(' · ')}`;
   }
   
-  // Set button actions (use IDs added by Bug 5 fix)
   const playBtn = document.getElementById('hero-play-btn');
   if (playBtn) {
     playBtn.onclick = () => {
@@ -878,6 +1618,7 @@ function updateHeroUI(movie) {
     wlBtn.onclick = () => {
       if (!watchlist.some(m => m.id === movie.id)) {
         addToWatchlist(movie, wlBtn);
+        updateWLIcon();
       }
     };
   }
@@ -906,7 +1647,7 @@ async function initHero() {
       heroMovie = await fetchTMDBDetails(randomId);
     }
   } else {
-    const fallbackIds = [1, 2, 3, 5, 7, 8]; // Dune 2, Oppenheimer, Past Lives, Killers of the Flower Moon, Interstellar, Arrival
+    const fallbackIds = [1, 2, 3, 5, 7, 8];
     const randomId = fallbackIds[Math.floor(Math.random() * fallbackIds.length)];
     heroMovie = await fetchTMDBDetails(randomId);
   }
@@ -915,4 +1656,3 @@ async function initHero() {
     updateHeroUI(heroMovie);
   }
 }
-

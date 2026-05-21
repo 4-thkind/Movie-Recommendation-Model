@@ -17,11 +17,12 @@
     <div class="logo-icon"><i class="fa-solid fa-film"></i></div>
     <span class="logo-text"><em>Cine</em>Match</span>
   </a>
-  <div class="nav-links">
-    <a href="#" class="active">Home</a>
-    <a href="#trending-section">Trending</a>
-    <a href="#surprise-section">Surprise Me</a>
-    <a href="#watchlist-section">Watchlist</a>
+  <div class="nav-links" id="nav-links">
+    <a href="#hero" data-section="hero" class="active">Home</a>
+    <a href="#trending-section" data-section="trending-section">Trending</a>
+    <a href="#platforms-section" data-section="platforms-section">Platforms</a>
+    <a href="#surprise-section" data-section="surprise-section">Surprise Me</a>
+    <a href="#watchlist-section" data-section="watchlist-section">Watchlist</a>
   </div>
   <div class="nav-search">
     <i class="fa-solid fa-magnifying-glass"></i>
@@ -62,38 +63,21 @@
   <div class="hero-fade"></div>
   <div class="hero-side"></div>
   <div class="hero-content">
-    <div class="match-chip">
-      <i class="fa-solid fa-circle-check" style="font-size:10px"></i>
-      98% Match For You
-    </div>
+    <div class="match-chip"><i class="fa-solid fa-circle-check" style="font-size:10px"></i> 98% Match For You</div>
     <h1 class="hero-title">Dune<br>Part Two</h1>
     <p class="hero-sub">2024 &nbsp;·&nbsp; 2h 46m &nbsp;·&nbsp; Sci-Fi &nbsp;·&nbsp; PG-13</p>
-    <p class="hero-synopsis">
-      Paul Atreides unites with Chani and the Fremen while seeking revenge
-      against the conspirators who destroyed his family — love and fate collide
-      on an impossible scale.
-    </p>
-    <div class="why-tag">
-      <i class="fa-solid fa-brain" style="font-size:10px;color:var(--vl)"></i>
-      Epic Sci-Fi · Narrative Depth · Denis Villeneuve
-    </div>
+    <p class="hero-synopsis">Paul Atreides unites with Chani and the Fremen while seeking revenge against the conspirators who destroyed his family — love and fate collide on an impossible scale.</p>
+    <div class="why-tag"><i class="fa-solid fa-brain" style="font-size:10px;color:var(--vl)"></i> Epic Sci-Fi · Narrative Depth · Denis Villeneuve</div>
     <div class="hero-btns">
-      <button class="btn-primary" id="hero-play-btn">
-        <i class="fa-solid fa-play" style="font-size:11px"></i> Play Trailer
-      </button>
-      <button class="btn-secondary" id="hero-info-btn">
-        <i class="fa-solid fa-circle-info"></i> More Info
-      </button>
-      <button class="btn-icon" id="hero-wl-btn" title="Add to watchlist">
-        <i class="fa-solid fa-plus"></i>
-      </button>
+      <button class="btn-primary" id="hero-play-btn"><i class="fa-solid fa-play" style="font-size:11px"></i> Play Trailer</button>
+      <button class="btn-secondary" id="hero-info-btn"><i class="fa-solid fa-circle-info"></i> More Info</button>
+      <button class="btn-icon" id="hero-wl-btn" title="Add to watchlist"><i class="fa-solid fa-plus"></i></button>
     </div>
   </div>
 </section>
 
 <!-- ═══ MAIN ═══ -->
 <main>
-
   <!-- Search Results Section -->
   <section id="search-section" style="display:none;padding-top:44px" class="reveal">
     <div class="sec-head">
@@ -113,61 +97,71 @@
     </div>
   </section>
 
+
   <!-- ROW 1: Top Picks -->
   <section style="padding-top:44px" class="reveal">
     <div class="sec-head">
       <div>
-        <div class="sec-title">
-          Top Picks For You
-        </div>
+        <div class="sec-title">Top Picks For You <span class="sec-tag tag-yellow">AI</span></div>
         <p class="sec-sub">Personalized from your taste profile · hover to explore</p>
       </div>
       <a href="#" class="see-all">See all <i class="fa-solid fa-chevron-right" style="font-size:10px"></i></a>
     </div>
     <div class="row-wrap" id="rw1-wrap">
       <div class="arr L" onclick="scrollRow('rw1',-1)"><i class="fa-solid fa-chevron-left"></i></div>
-      <div class="row-scroll" id="rw1"></div>
+      <div class="row-scroll" id="rw1" onmouseleave="hidePopup()"></div>
       <div class="arr R" onclick="scrollRow('rw1',1)"><i class="fa-solid fa-chevron-right"></i></div>
     </div>
   </section>
 
   <!-- ROW 2: Because You Watched -->
-  <section style="padding-top:40px" class="reveal">
+  <section style="padding-top:44px" class="reveal">
     <div class="sec-head">
       <div>
-        <div class="sec-title">
-          <i class="fa-solid fa-link" style="color:var(--vl);font-size:15px"></i>
-          Because you watched <span style="color:var(--vl)">Interstellar</span>
-        </div>
+        <div class="sec-title"><i class="fa-solid fa-link" style="color:var(--vl);font-size:15px"></i> Because you watched <span style="color:var(--vl)">Interstellar</span></div>
         <p class="sec-sub">Matched on: Space · Emotional depth · Hans Zimmer</p>
       </div>
       <a href="#" class="see-all">See all <i class="fa-solid fa-chevron-right" style="font-size:10px"></i></a>
     </div>
     <div class="row-wrap" id="rw2-wrap">
       <div class="arr L" onclick="scrollRow('rw2',-1)"><i class="fa-solid fa-chevron-left"></i></div>
-      <div class="row-scroll" id="rw2"></div>
+      <div class="row-scroll" id="rw2" onmouseleave="hidePopup()"></div>
       <div class="arr R" onclick="scrollRow('rw2',1)"><i class="fa-solid fa-chevron-right"></i></div>
     </div>
   </section>
 
-  <!-- ═══ CURRENTLY TRENDING ═══ -->
+  <!-- ═══ TRENDING — horizontal scroll ═══ -->
   <section id="trending-section" class="reveal">
     <div class="sec-head">
       <div>
-        <div class="sec-title">
-          <i class="fa-solid fa-fire-flame-curved" style="color:#f87171;font-size:16px"></i>
-          Currently Trending
-          <span class="sec-tag tag-hot">Live</span>
-        </div>
-        <p class="sec-sub">What the world is watching right now</p>
+        <div class="sec-title"><i class="fa-solid fa-fire-flame-curved" style="color:#f87171;font-size:16px"></i> Currently Trending <span class="sec-tag tag-hot"><span class="live-dot"></span>Live</span></div>
+        <p class="sec-sub">What the world is watching right now · scroll to see more</p>
       </div>
       <a href="#" class="see-all">Full chart <i class="fa-solid fa-chevron-right" style="font-size:10px"></i></a>
     </div>
-    <div class="row-wrap" id="trending-wrap">
-      <div class="arr L" onclick="scrollRow('trending-grid',-1)"><i class="fa-solid fa-chevron-left"></i></div>
-      <div class="trending-grid" id="trending-grid"></div>
-      <div class="arr R" onclick="scrollRow('trending-grid',1)"><i class="fa-solid fa-chevron-right"></i></div>
+    <div class="trend-scroll-wrap" id="trend-wrap">
+      <div class="trend-arr L" onclick="scrollTrend(-1)"><i class="fa-solid fa-chevron-left"></i></div>
+      <div class="trend-row" id="trend-row"></div>
+      <div class="trend-arr R" onclick="scrollTrend(1)"><i class="fa-solid fa-chevron-right"></i></div>
     </div>
+  </section>
+
+  <!-- ═══ PLATFORM BROWSER ═══ -->
+  <section id="platforms-section" class="reveal">
+    <div class="sec-head">
+      <div>
+        <div class="sec-title"><i class="fa-solid fa-tv" style="color:var(--vl);font-size:16px"></i> Browse by Platform <span class="sec-tag tag-violet">All Services</span></div>
+        <p class="sec-sub">What's streaming now — movies & series by platform</p>
+      </div>
+      <div class="type-toggle">
+        <button class="type-pill active" id="pill-movies" onclick="setType('movies')">Movies</button>
+        <button class="type-pill" id="pill-series" onclick="setType('series')">Series</button>
+      </div>
+    </div>
+    <!-- Platform tabs -->
+    <div class="platform-tabs" id="plat-tabs"></div>
+    <!-- Content panels (one per platform, shown/hidden) -->
+    <div id="plat-panels"></div>
   </section>
 
   <!-- ═══ SURPRISE ME ═══ -->
@@ -176,9 +170,7 @@
       <h2>Feeling Indecisive?</h2>
       <p>Let the AI pick something perfect for you. Click the orb.</p>
     </div>
-    <div class="surprise-orb" id="surprise-btn" onclick="surpriseMe()">
-      <i class="fa-solid fa-wand-magic-sparkles"></i>
-    </div>
+    <div class="surprise-orb" id="surprise-btn" onclick="surpriseMe()"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
     <div id="surprise-result">
       <div class="s-card">
         <img class="s-card-img" id="s-img" src="" alt=""/>
@@ -190,12 +182,8 @@
             <div class="s-card-synopsis" id="s-synopsis"></div>
           </div>
           <div class="s-card-btns">
-            <button class="btn-primary" style="font-size:12px;padding:9px 18px" id="s-modal-btn">
-              <i class="fa-solid fa-circle-info" style="font-size:11px"></i> Details
-            </button>
-            <button class="btn-secondary" style="font-size:12px;padding:9px 14px" id="s-add-btn">
-              <i class="fa-solid fa-plus" style="font-size:11px"></i> Watchlist
-            </button>
+            <button class="btn-primary" style="font-size:12px;padding:9px 18px" id="s-modal-btn"><i class="fa-solid fa-circle-info" style="font-size:11px"></i> Details</button>
+            <button class="btn-secondary" style="font-size:12px;padding:9px 14px" id="s-add-btn"><i class="fa-solid fa-plus" style="font-size:11px"></i> Watchlist</button>
           </div>
         </div>
       </div>
@@ -209,34 +197,53 @@
         <div class="sec-title">
           <i class="fa-solid fa-bookmark" style="color:var(--y);font-size:15px"></i>
           My Watchlist
-          <span class="sec-tag tag-violet">Roulette</span>
         </div>
-        <p class="sec-sub">Add movies, then spin to decide what to watch tonight</p>
+        <p class="sec-sub">Add movies to your list, then let the roulette decide what to watch</p>
       </div>
     </div>
+
+    <!-- Watchlist strip -->
     <div id="wl-strip">
       <div class="wl-empty" id="wl-empty">
         <i class="fa-regular fa-bookmark"></i>
-        <p>Your watchlist is empty — hover cards above and add movies</p>
+        <p>Your watchlist is empty — hover cards above and click + to add</p>
       </div>
     </div>
+
+    <!-- Prompt: appears after items are added, before roulette -->
+    <div id="roulette-prompt">
+      <div class="rp-inner">
+        <div class="rp-icon"><i class="fa-solid fa-film"></i></div>
+        <div class="rp-text">
+          <p class="rp-title">Can't decide what to watch?</p>
+          <p class="rp-sub">You have <strong id="rp-count">0</strong> movies saved. Let the roulette pick for you.</p>
+        </div>
+        <button class="rp-yes" id="rp-yes-btn" onclick="openRoulette()">
+          <i class="fa-solid fa-dice"></i> Yes, spin it!
+        </button>
+        <button class="rp-no" onclick="dismissRoulette()">Maybe later</button>
+      </div>
+    </div>
+
+    <!-- Roulette — hidden until user says yes -->
     <div id="roulette-wrap">
-      <div class="roulette-title">
-        <i class="fa-solid fa-dice" style="color:var(--y)"></i>
-        Watchlist Roulette
+      <div class="roulette-header">
+        <div class="roulette-title"><i class="fa-solid fa-dice" style="color:var(--y)"></i> Watchlist Roulette</div>
+        <button class="roulette-close" onclick="closeRoulette()" title="Close roulette">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
       </div>
       <div class="drum-wrap" id="drum-wrap">
         <div id="drum-inner"></div>
         <div class="drum-cursor"></div>
       </div>
-      <button class="spin-btn" id="spin-btn" onclick="spinRoulette()" disabled>
-        <i class="fa-solid fa-rotate" id="spin-icon"></i>
-        Spin to Decide
+      <button class="spin-btn" id="spin-btn" onclick="spinRoulette()">
+        <i class="fa-solid fa-rotate" id="spin-icon"></i> Spin to Decide
       </button>
       <div id="winner-reveal">
-        <p style="font-size:11px;color:var(--t3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;font-family:'Syne',sans-serif">Tonight's Pick</p>
+        <p class="winner-label">Tonight's Pick</p>
         <h3 id="winner-name"></h3>
-        <p id="winner-meta" style="margin-top:4px"></p>
+        <p id="winner-meta" style="margin-top:4px;font-size:12px;color:var(--t2)"></p>
         <button class="btn-primary" style="margin-top:14px;font-size:12px;padding:9px 22px" id="winner-open">
           <i class="fa-solid fa-play" style="font-size:10px"></i> Watch Now
         </button>
@@ -246,75 +253,6 @@
 
 </main>
 
-<!-- ═══ MODAL ═══ -->
-<div id="overlay" onclick="handleOverlay(event)">
-  <div id="modal">
-    <div class="m-hero">
-      <img id="m-backdrop" src="" alt=""/>
-      <div class="m-hero-fade"></div>
-      <div class="m-hero-side"></div>
-      <button class="m-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
-      
-      <!-- Overlaying Poster -->
-      <div class="m-poster-wrap">
-        <div class="m-poster-img-container">
-          <img id="m-poster" src="" alt=""/>
-        </div>
-        <div class="m-head">
-          <div class="match-chip" id="m-chip" style="margin-bottom:10px"></div>
-          <div style="font-size:27px;font-weight:900;letter-spacing:-.6px;font-family:'Syne',sans-serif" id="m-title"></div>
-          <div style="font-size:12px;color:var(--t2);margin-top:5px" id="m-year"></div>
-        </div>
-      </div>
-    </div>
-    <div class="m-body">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:15px">
-        <button id="m-add-wl-new">Add to Watchlist</button>
-      </div>
-      <div class="m-grid">
-        <div class="m-stat"><p>Rating</p><p id="m-rating" style="color:var(--y)"></p></div>
-        <div class="m-stat"><p>Runtime</p><p id="m-runtime"></p></div>
-        <div class="m-stat"><p>Genre</p><p id="m-genre"></p></div>
-        <div class="m-stat"><p>Streaming</p><div class="m-platforms" id="m-platforms"></div></div>
-      </div>
-      
-      <!-- User Rating Stars Box -->
-      <div class="user-rating-box" style="margin: 15px 0 22px; background: var(--b3); border: 1px solid rgba(255,255,255,.05); border-radius: 10px; padding: 15px; display: flex; align-items: center; justify-content: space-between; gap: 15px">
-        <div style="font-size: 11px; font-weight: 700; color: var(--t2); text-transform: uppercase; letter-spacing: .1em"><i class="fa-solid fa-star" style="color:var(--y);margin-right:6px"></i>Your Rating</div>
-        <div class="user-stars" style="display: flex; gap: 6px; font-size: 18px; color: var(--t3); cursor: pointer">
-          <i class="fa-regular fa-star" data-value="1"></i>
-          <i class="fa-regular fa-star" data-value="2"></i>
-          <i class="fa-regular fa-star" data-value="3"></i>
-          <i class="fa-regular fa-star" data-value="4"></i>
-          <i class="fa-regular fa-star" data-value="5"></i>
-        </div>
-      </div>
-
-      <!-- YouTube Embed Trailer Container -->
-      <div id="m-video-container" style="display: none; margin-bottom: 22px; border-radius: 10px; overflow: hidden; position: relative; padding-bottom: 56.25%; height: 0">
-        <iframe id="m-video-iframe" src="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-      </div>
-
-      <p class="m-synopsis" id="m-synopsis"></p>
-      <div class="ai-box">
-        <div class="ai-box-head"><i class="fa-solid fa-brain"></i> Why CineMatch picked this</div>
-        <div class="ai-pills" id="m-reasons"></div>
-      </div>
-      <p style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:13px">Cast</p>
-      <div class="m-cast-row" id="m-cast"></div>
-      <p style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">You May Also Like</p>
-      <div class="mini-row" id="m-similar"></div>
-      <div class="m-actions">
-        <button class="btn-primary" id="m-play-btn" style="font-size:12px;padding:10px 22px">
-          <i class="fa-solid fa-play" style="font-size:10px"></i> Play Trailer
-        </button>
-        <button class="danger-btn" onclick="closeModal()">
-          <i class="fa-solid fa-ban" style="font-size:11px"></i> Don't Show Again
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- ═══ SETTINGS MODAL ═══ -->
 <div id="settings-overlay" onclick="handleSettingsOverlay(event)">
@@ -339,6 +277,96 @@
       </div>
 
       <button class="btn-primary" style="width:100%;justify-content:center" onclick="saveSettings()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <a href="#" class="footer-logo"><div class="logo-icon"><i class="fa-solid fa-film"></i></div><span><em>Cine</em>Match</span></a>
+  <div class="footer-links">
+    <a href="#hero">Home</a>
+    <a href="#trending-section">Trending</a>
+    <a href="#platforms-section">Platforms</a>
+    <a href="#surprise-section">Surprise Me</a>
+    <a href="#watchlist-section">Watchlist</a>
+    <a href="#">About</a>
+  </div>
+  <span class="footer-copy">© 2026 CineMatch · AI-powered recommendations</span>
+</footer>
+
+<!-- ═══ SHARED FLOATING POPUP ═══ -->
+<div id="card-popup">
+  <div class="popup-img-wrap"><img class="popup-img" id="pp-img" src="" alt=""/></div>
+  <div class="popup-body">
+    <div class="popup-actions">
+      <button class="pa-btn pa-play" id="pp-play" title="Watch Now"><i class="fa-solid fa-play" style="margin-left:2px;font-size:10px"></i></button>
+      <button class="pa-btn pa-add" id="pp-add" title="Add to Watchlist"><i class="fa-solid fa-plus" style="font-size:10px"></i></button>
+      <button class="pa-btn pa-thumb" title="Like"><i class="fa-solid fa-thumbs-up" style="font-size:10px"></i></button>
+      <button class="pa-btn pa-info" id="pp-info" title="More Info"><i class="fa-solid fa-chevron-down" style="font-size:10px"></i></button>
+    </div>
+    <div class="popup-meta-row">
+      <span class="pm-match" id="pp-match"></span>
+      <span class="pm-rating"><i class="fa-solid fa-star" style="font-size:9px"></i><span id="pp-rating"></span></span>
+      <span class="pm-badge" id="pp-cert"></span>
+    </div>
+    <div class="popup-title" id="pp-title"></div>
+    <div class="popup-genres" id="pp-genres"></div>
+  </div>
+</div>
+
+<!-- ═══ MODAL ═══ -->
+<div id="overlay" onclick="handleOverlay(event)">
+  <div id="modal">
+    <div class="m-hero">
+      <img id="m-backdrop" src="" alt=""/>
+      <img id="m-poster" src="" alt="" style="display:none;"/>
+      <div class="m-hero-fade"></div><div class="m-hero-side"></div>
+      <button class="m-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+      <div class="m-head">
+        <div class="match-chip" id="m-chip" style="margin-bottom:10px"></div>
+        <div style="font-size:27px;font-weight:900;letter-spacing:-.6px;font-family:'Syne',sans-serif" id="m-title"></div>
+        <div style="font-size:12px;color:var(--t2);margin-top:5px" id="m-year"></div>
+      </div>
+    </div>
+    <div class="m-body">
+      <div class="m-grid">
+        <div class="m-stat"><p>Rating</p><p id="m-rating" style="color:var(--y)"></p></div>
+        <div class="m-stat"><p>Runtime</p><p id="m-runtime"></p></div>
+        <div class="m-stat"><p>Genre</p><p id="m-genre"></p></div>
+        <div class="m-stat"><p>Streaming</p><div class="m-platforms" id="m-platforms"></div></div>
+      </div>
+
+      <!-- User Rating Stars Box -->
+      <div class="user-rating-box" style="margin: 15px 0 22px; background: var(--b3); border: 1px solid rgba(255,255,255,.05); border-radius: 10px; padding: 15px; display: flex; align-items: center; justify-content: space-between; gap: 15px">
+        <div style="font-size: 11px; font-weight: 700; color: var(--t2); text-transform: uppercase; letter-spacing: .1em"><i class="fa-solid fa-star" style="color:var(--y);margin-right:6px"></i>Your Rating</div>
+        <div class="user-stars" style="display: flex; gap: 6px; font-size: 18px; color: var(--t3); cursor: pointer">
+          <i class="fa-regular fa-star" data-value="1"></i>
+          <i class="fa-regular fa-star" data-value="2"></i>
+          <i class="fa-regular fa-star" data-value="3"></i>
+          <i class="fa-regular fa-star" data-value="4"></i>
+          <i class="fa-regular fa-star" data-value="5"></i>
+        </div>
+      </div>
+
+      <!-- YouTube Embed Trailer Container -->
+      <div id="m-video-container" style="display: none; margin-bottom: 22px; border-radius: 10px; overflow: hidden; position: relative; padding-bottom: 56.25%; height: 0">
+        <iframe id="m-video-iframe" src="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+      </div>
+      <p class="m-synopsis" id="m-synopsis"></p>
+      <div class="ai-box">
+        <div class="ai-box-head"><i class="fa-solid fa-brain"></i> Why CineMatch picked this</div>
+        <div class="ai-pills" id="m-reasons"></div>
+      </div>
+      <p style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:13px">Cast</p>
+      <div class="m-cast-row" id="m-cast"></div>
+      <p style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">You May Also Like</p>
+      <div class="mini-row" id="m-similar"></div>
+      <div class="m-actions">
+        <button class="btn-primary" id="m-play-btn" style="font-size:12px;padding:10px 22px"><i class="fa-solid fa-play" style="font-size:10px"></i> Play Trailer</button>
+        <button class="btn-secondary" style="font-size:12px;padding:10px 18px" id="m-add-wl-new"><i class="fa-solid fa-plus" style="font-size:10px"></i> Watchlist</button>
+        <button class="danger-btn" onclick="closeModal()"><i class="fa-solid fa-ban" style="font-size:11px"></i> Don't Show Again</button>
+      </div>
     </div>
   </div>
 </div>
