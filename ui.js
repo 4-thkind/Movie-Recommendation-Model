@@ -4335,8 +4335,159 @@ export async function startHeroRotation() {
 export function stopHeroRotation() {
   clearInterval(heroRotationInterval);
   heroRotationInterval = null;
+  _stopHeroHoverProgress();
   const dotsEl = document.getElementById('hero-dots');
   if (dotsEl) dotsEl.innerHTML = '';
+}
+
+/* ─── HERO CUSTOM CURSOR + HOVER PROGRESS RING ─── */
+const RING_CIRCUMFERENCE = 2 * Math.PI * 27; // ~169.646 — matches SVG r=27
+let heroHoverRAF = null;
+let heroHoverStartTime = 0;
+let heroHoverActive = false;
+let heroCursorSide = 'right'; // 'left' or 'right' based on mouse position
+
+function _setRingProgress(fraction) {
+  const offset = RING_CIRCUMFERENCE * (1 - fraction);
+  const ring = document.querySelector('#hero-cursor .ring-fill');
+  if (ring) ring.style.strokeDashoffset = offset;
+  const cursor = document.getElementById('hero-cursor');
+  if (cursor) cursor.classList.toggle('ring-complete', fraction >= 1);
+}
+
+function _heroHoverLoop(timestamp) {
+  if (!heroHoverActive) return;
+  if (!heroHoverStartTime) heroHoverStartTime = timestamp;
+  const elapsed = timestamp - heroHoverStartTime;
+  const fraction = Math.min(elapsed / HERO_ROTATION_DURATION, 1);
+  _setRingProgress(fraction);
+
+  if (fraction >= 1) {
+    // Auto-advance based on which side cursor is on
+    if (heroRotationPool.length >= 2) {
+      if (heroCursorSide === 'left') {
+        heroRotationIndex = (heroRotationIndex - 1 + heroRotationPool.length) % heroRotationPool.length;
+      } else {
+        heroRotationIndex = (heroRotationIndex + 1) % heroRotationPool.length;
+      }
+      _showHeroSlide(heroRotationIndex);
+      _updateHeroDots(heroRotationPool.length, heroRotationIndex);
+    }
+    heroHoverStartTime = 0;
+    _setRingProgress(0);
+  }
+
+  heroHoverRAF = requestAnimationFrame(_heroHoverLoop);
+}
+
+function _startHeroHoverProgress() {
+  if (heroHoverActive) return;
+  heroHoverActive = true;
+  heroHoverStartTime = 0;
+  _setRingProgress(0);
+  const heroEl = document.getElementById('hero');
+  if (heroEl) heroEl.classList.add('hero-hover-active');
+  const cursor = document.getElementById('hero-cursor');
+  if (cursor) cursor.classList.add('visible');
+  heroHoverRAF = requestAnimationFrame(_heroHoverLoop);
+}
+
+function _stopHeroHoverProgress() {
+  heroHoverActive = false;
+  heroHoverStartTime = 0;
+  if (heroHoverRAF) { cancelAnimationFrame(heroHoverRAF); heroHoverRAF = null; }
+  _setRingProgress(0);
+  const heroEl = document.getElementById('hero');
+  if (heroEl) heroEl.classList.remove('hero-hover-active');
+  const cursor = document.getElementById('hero-cursor');
+  if (cursor) cursor.classList.remove('visible');
+}
+
+function _heroNavigate(direction) {
+  if (heroRotationPool.length < 2) return;
+  if (direction === 'prev') {
+    heroRotationIndex = (heroRotationIndex - 1 + heroRotationPool.length) % heroRotationPool.length;
+  } else {
+    heroRotationIndex = (heroRotationIndex + 1) % heroRotationPool.length;
+  }
+  _showHeroSlide(heroRotationIndex);
+  _updateHeroDots(heroRotationPool.length, heroRotationIndex);
+  heroHoverStartTime = 0;
+  _setRingProgress(0);
+  if (!heroHoverActive) _restartProgress();
+}
+
+// Wire the hero hover + custom cursor after DOM is ready
+function initHeroNavArrows() {
+  const heroEl = document.getElementById('hero');
+  const cursorEl = document.getElementById('hero-cursor');
+  if (!heroEl || !cursorEl) return;
+
+  let mouseX = -100;
+  let mouseY = -100;
+  let isClicking = false;
+
+  function updateCursorPos(x, y) {
+    mouseX = x;
+    mouseY = y;
+    const scale = isClicking ? 0.88 : 1;
+    cursorEl.style.transform = `translate3d(${x - 28}px, ${y - 28}px, 0) scale(${scale})`;
+  }
+
+  // Follow the mouse with translate3d
+  heroEl.addEventListener('mousemove', (e) => {
+    updateCursorPos(e.clientX, e.clientY);
+
+    // Determine left/right half
+    const rect = heroEl.getBoundingClientRect();
+    const midX = rect.left + rect.width / 2;
+    const side = e.clientX < midX ? 'left' : 'right';
+    if (side !== heroCursorSide) {
+      heroCursorSide = side;
+      cursorEl.classList.toggle('cursor-left', side === 'left');
+    }
+  }, { passive: true });
+
+  // Enter hero = pause interval, start ring + show cursor
+  heroEl.addEventListener('mouseenter', (e) => {
+    clearInterval(heroRotationInterval);
+    heroRotationInterval = null;
+    updateCursorPos(e.clientX, e.clientY);
+    _startHeroHoverProgress();
+  });
+
+  // Leave hero = hide cursor, resume interval
+  heroEl.addEventListener('mouseleave', () => {
+    _stopHeroHoverProgress();
+    if (heroRotationPool.length >= 2) {
+      _restartProgress();
+    }
+  });
+
+  // Click = navigate based on cursor side
+  heroEl.addEventListener('click', (e) => {
+    // Don't hijack clicks on buttons/links inside hero
+    if (e.target.closest('button, a, .hero-dots')) return;
+    
+    isClicking = true;
+    updateCursorPos(e.clientX, e.clientY);
+    setTimeout(() => {
+      isClicking = false;
+      updateCursorPos(mouseX, mouseY);
+    }, 150);
+
+    _heroNavigate(heroCursorSide === 'left' ? 'prev' : 'next');
+    // Restart the ring cycle
+    heroHoverStartTime = 0;
+    _setRingProgress(0);
+  });
+}
+
+// Initialize hero cursor after DOM load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initHeroNavArrows);
+} else {
+  initHeroNavArrows();
 }
 
 // Wire See All buttons grid toggle immediately
