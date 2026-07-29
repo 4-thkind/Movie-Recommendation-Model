@@ -12,6 +12,28 @@ try {
 } catch (err) {
   console.warn('Could not load .env file', err);
 }
+
+// If no direct API key was found (e.g. deployed on Cloudflare Pages without .env),
+// fall back to using Cloudflare Pages Function proxy (/api/*)
+if (!TMDB_API_KEY) {
+  TMDB_API_KEY = 'cf_proxy';
+}
+
+if (TMDB_API_KEY === 'cf_proxy') {
+  const originalFetch = window.fetch;
+  window.fetch = function (resource, options) {
+    let url = typeof resource === 'string' ? resource : (resource && resource.url ? resource.url : '');
+    if (url && url.includes('api.themoviedb.org')) {
+      const proxyUrl = url.replace(/^https?:\/\/api\.themoviedb\.org\//, '/api/');
+      if (typeof resource === 'string') {
+        return originalFetch(proxyUrl, options);
+      } else {
+        return originalFetch(new Request(proxyUrl, resource), options);
+      }
+    }
+    return originalFetch(resource, options);
+  };
+}
 export const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
 export const DEFAULT_RECS = [
   318, 858, 296, 527, 593, 2571, 50, 1198, 2858, 47,
