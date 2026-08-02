@@ -1759,7 +1759,7 @@ export function renderPlatCards(platId, type) {
     card.className = 'plat-card';
     card.dataset.id = m.id;
     card.innerHTML = `
-      <img src="${m.poster}" alt="${m.title}"/>
+      <img src="${m.poster}" alt="${m.title}" loading="lazy"/>
       <div class="plat-card-overlay"></div>
       <div class="plat-card-badge badge-${type}">${type === 'series' ? 'Series' : 'Movie'}</div>
       <div class="plat-card-info">
@@ -2575,7 +2575,7 @@ function openModalContent(movie) {
             if (topProviders.length > 0) {
               providersHtml = topProviders.map(p => {
                 const logoUrl = `https://image.tmdb.org/t/p/w45${p.logo_path}`;
-                return `<span class="plat-badge" style="padding-left:4px"><img src="${logoUrl}" alt="${p.display_name}" class="plat-logo"/>${p.display_name}</span>`;
+                return `<span class="plat-badge" style="padding-left:4px"><img src="${logoUrl}" alt="${p.display_name}" class="plat-logo" loading="lazy"/>${p.display_name}</span>`;
               }).join('');
             }
           }
@@ -2612,7 +2612,7 @@ function openModalContent(movie) {
     ];
     document.getElementById('m-director').innerHTML = directorList.map((d, idx) => `
       <div class="m-director-person" data-director-index="${idx}">
-        <img src="${d.img}" alt="${d.name}"/>
+        <img src="${d.img}" alt="${d.name}" loading="lazy"/>
         <span>${d.name}</span>
       </div>
     `).join('');
@@ -2625,7 +2625,7 @@ function openModalContent(movie) {
     
     document.getElementById('m-cast').innerHTML = castList.map((c, idx) => `
       <div class="m-cast-person" data-cast-index="${idx}">
-        <img src="${c.img}" alt="${c.name}"/>
+        <img src="${c.img}" alt="${c.name}" loading="lazy"/>
         <span>${c.name}</span>
       </div>
     `).join('');
@@ -2679,7 +2679,7 @@ function openModalContent(movie) {
     ];
     document.getElementById('m-director').innerHTML = directorList.map((d, idx) => `
       <div class="m-director-person" data-director-index="${idx}">
-        <img src="${d.img}" alt="${d.name}"/>
+        <img src="${d.img}" alt="${d.name}" loading="lazy"/>
         <span>${d.name}</span>
       </div>
     `).join('');
@@ -2692,7 +2692,7 @@ function openModalContent(movie) {
     
     document.getElementById('m-cast').innerHTML = castList.map((c, idx) => `
       <div class="m-cast-person" data-cast-index="${idx}">
-        <img src="${c.img}" alt="${c.name}"/>
+        <img src="${c.img}" alt="${c.name}" loading="lazy"/>
         <span>${c.name}</span>
       </div>
     `).join('');
@@ -4534,9 +4534,16 @@ export function initNavbarScroll() {
     }, 200); // Wait 200ms of inactivity to slide it back down
   };
   
+  let ticking = false;
   window.addEventListener('scroll', () => {
-    updateScrolledState();
-    handleScrollBehavior();
+    if (!ticking) {
+      window.requestAnimationFrame(() => {
+        updateScrolledState();
+        handleScrollBehavior();
+        ticking = false;
+      });
+      ticking = true;
+    }
   }, { passive: true });
   
   // Initial check on page load without triggering hide animation
