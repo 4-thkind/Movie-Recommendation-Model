@@ -72,17 +72,16 @@ The interface the model drives is equally deliberate: a full streaming-platform 
 | Collaborative / Content blend | α = 0.70 / 0.30 |
 | CSS lines | ~4,000 |
 | Core UI logic | ~2,500 lines |
-| Framework dependencies | **Zero** |
-| Build step | **None** |
 | Personalized home rows | 17 |
 
 ---
 
 ## 🏗 System Architecture
 
-The entire application is orchestrated from `app.js`, which boots a chain of initialization: reactive state → API-key detection → recommendation engine → UI layer → WebGL gallery → onboarding flow. The ML model is the central nervous system — every personalized row, every match badge, every ranked result flows from it.
+The entire application is orchestrated from `app.js`, which boots a chain of initialization: reactive state → API-key detection → recommendation engine → UI layer → WebGL gallery → onboarding flow. `ml-model.js` is the central nervous system — every personalized row, every match badge, every ranked result flows from it.
 
 ```mermaid
+%%{init: {'theme': 'dark'}}%%
 flowchart TD
     A[index.html\nSingle-page shell] --> B[app.js\nEntry & Orchestration]
 
@@ -116,13 +115,14 @@ flowchart TD
 ATLASS selects its operating mode automatically at startup based on whether a TMDb API key is present in `localStorage`. The switch is invisible to the user — both modes surface the same UI structure — but the data path, poster fidelity, and recommendation strategy differ meaningfully.
 
 ```mermaid
+%%{init: {'theme': 'dark'}}%%
 flowchart TD
     START([App Startup]) --> DETECT{API Key in\nlocalStorage?}
 
     DETECT -->|Yes| LIVE_START[LIVE MODE]
     DETECT -->|No| OFF_START[OFFLINE MODE]
 
-    subgraph LIVE [" 🔴  Live Mode — TMDb API Active "]
+    subgraph LIVE [" Live Mode — TMDb API Active "]
         LIVE_START --> L1[Detect API Key\nValidate credentials]
         L1 --> L2[Fetch /recommendations\nUp to 3 seed movies in parallel]
         L2 --> L3[Round-robin merge\n+ Set-based deduplication]
@@ -133,7 +133,7 @@ flowchart TD
         L6 --> L7
     end
 
-    subgraph OFFLINE [" 🔵  Offline Mode — ML Model Active "]
+    subgraph OFFLINE [" Offline Mode — ML Model Active "]
         OFF_START --> O1[Load MovieLens CSVs\n9,742 movies · 100,836 ratings]
         O1 --> O2[Parse + Map\nlinks.csv → TMDb IDs]
         O2 --> O3[Load model.json\nSVD k=32 weight matrix]
@@ -158,43 +158,15 @@ flowchart TD
 
 The engine is the intellectual core of ATLASS. It is not a wrapper around a hosted ML service — it is a real inference pipeline running entirely inside the browser, using pre-trained weight matrices fetched from JSON files and a fold-in algorithm that projects ratings into a latent space without ever retraining the model. Everything you see on screen — every row, every rank, every match percentage — is computed by this pipeline.
 
-```mermaid
-sequenceDiagram
-    actor User
-    participant State as state.js
-    participant Rec as recommender.js
-    participant ML as ml-model.js
-    participant UI as ui.js
+When a user rates a movie, the following three-stage inference runs client-side:
 
-    User->>State: Rate movie (1–5 ★)
-    State->>Rec: Trigger initializeRecommender()
+1. **SVD Fold-In** — each rated film's 32-dimensional item vector is weighted by how far the rating deviates from the global mean (μ = 3.5016). Positive deviations pull the user vector toward that film; negative deviations push away. The weighted average produces a 32-d taste vector encoding what the user genuinely responds to.
 
-    Rec->>ML: loadModel()
-    ML-->>ML: Fetch model.json (SVD k=32)
-    ML-->>ML: Fetch content_model.json (LSA dim=48)
-    ML-->>Rec: Model ready
+2. **Content Profile** — every film rated 3.5★ or higher contributes its 48-dimensional LSA content vector (derived offline from TF-IDF on Wikipedia plot text). These are averaged and L2-normalized so directional similarity, not magnitude, drives the content signal.
 
-    Rec->>ML: getRecommendations(userRatings, topN)
+3. **Hybrid Score** — each unseen film is scored as `0.70 × SVD_dot + 0.30 × content_dot`, ranked descending, and injected as personalized rows. Match percentages are clamped to 75–99% to stay psychologically meaningful.
 
-    Note over ML: ── Stage 1: SVD Fold-In ──
-    ML-->>ML: Compute deviation (r_ui − μ) per rated film
-    ML-->>ML: Weight each item vector by deviation magnitude
-    ML-->>ML: Average → 32-d user taste vector ū
-
-    Note over ML: ── Stage 2: Content Profile ──
-    ML-->>ML: Collect 48-d LSA vectors for films rated ≥ 3.5★
-    ML-->>ML: Average + L2-normalize → content profile p̄
-
-    Note over ML: ── Stage 3: Hybrid Score ──
-    ML-->>ML: score(m) = 0.70 × (v̄_m · ū) + 0.30 × (c̄_m · p̄)
-    ML-->>ML: Rank all unseen films descending
-
-    ML-->>Rec: Sorted movieIds + scores
-    Rec-->>UI: Inject "Top Picks For You" row
-
-    UI-->>UI: match% = clamp(75 + score/5 × 24, 75, 99)
-    UI-->>User: Cards with % confidence badges
-```
+No server round-trip. No retraining. The model runs entirely in `ml-model.js` from the pre-trained `model.json` and `content_model.json` weight matrices.
 
 ### SVD Fold-In
 
@@ -255,6 +227,7 @@ score = Math.min(99, Math.max(0, score)); // hard ceiling
 Every element on screen is a direct output of the recommendation pipeline. The card builder reads model scores; row titles reflect the signal that generated them; match badges display computed probabilities. The UI is a single `ui.js` module of over 2,500 lines — cards, infinite scroll, modal system, hover popups, platform browser, search — all wired directly to model output.
 
 ```mermaid
+%%{init: {'theme': 'dark'}}%%
 flowchart TD
     ML_OUT[ml-model.js\nRecommendation Scores] --> ROWS[Row Orchestrator\n17 personalized sections]
 
@@ -290,23 +263,12 @@ flowchart TD
 
 ### Card Hover Expand
 
-The Netflix-style hover popup uses a **delayed expansion** pattern to avoid accidental triggers during fast scroll:
+The Netflix-style hover popup uses a delayed expansion pattern to avoid accidental triggers during fast scrolls:
 
-```mermaid
-flowchart TD
-    A[mouseenter event] --> B[setTimeout 500ms delay]
-    B --> C{mouseleave\nbefore timeout?}
-
-    C -->|Yes — fast scroll| D[clearTimeout\nNo DOM change]
-    C -->|No — intentional hover| E[buildExpandPanel\nAttach to card DOM]
-
-    E --> F[Clamp to viewport\nLeft or right expand]
-    F --> G[CSS morph\ncard-is-expanded class]
-
-    G --> H{Panel\nmouseleave?}
-    H -->|Yes| I[hidePopup\nCollapse card]
-    H -->|No| G
-```
+- `mouseenter` starts a 500ms `setTimeout` before any DOM change
+- If `mouseleave` fires before the timeout, `clearTimeout` cancels it — no popup, no flicker
+- If the hover holds, `buildExpandPanel` attaches to the card, clamped to the viewport (left or right expand depending on position)
+- A CSS `card-is-expanded` class morphs the card; `mouseleave` on the panel collapses it
 
 ### Infinite Scroll Engine
 
@@ -334,6 +296,7 @@ Each card gets a CSS custom property `--glow-color` derived from its primary gen
 The onboarding flow is the model's cold-start solution — a three-step sequence that runs before the main app renders, gathering enough signal to populate a fully personalized feed for a brand new user. Genre and language preferences seed the initial content profile; swipe decisions train the model's exclusion list and warm up the taste vector with real interaction data.
 
 ```mermaid
+%%{init: {'theme': 'dark'}}%%
 flowchart TD
     A([User Logs In]) --> B{Onboarding\ncomplete?}
 
@@ -366,52 +329,18 @@ flowchart TD
 
 ### The Swipe Feedback Loop
 
-The most interesting aspect of onboarding is that it doesn't stop learning once you start swiping. Every right-swipe immediately triggers a fetch for similar movies, dynamically expanding the queue without ever running out of content:
+The onboarding deck doesn't stop learning once you start swiping. Every right-swipe immediately expands the queue with similar titles so you never run out of cards:
 
-```mermaid
-flowchart TD
-    A([Swipe Right on Movie M]) --> B[Add M to swipedLikes]
-
-    B --> C{API Key\nPresent?}
-
-    C -->|Yes| D[Fetch /movie/M/recommendations\nLive TMDb endpoint]
-    C -->|No| E[Match genres in MOVIES\nOffline corpus search]
-
-    D --> F[Filter results\nUnseen · Not disliked · Released]
-    E --> F
-
-    F --> G{Results\nfound?}
-    G -->|Yes| H[Append ≤5 to swipeQueue\nMore signal → better cold-start]
-    G -->|No| I[Expand genre search\nLoosen constraints]
-    I --> F
-
-    H --> J[Queue grows dynamically\nUser never runs out of cards]
-```
-
-By the time onboarding completes, ATLASS has gathered enough signal to distinguish between someone who likes *cerebral* sci-fi versus someone who prefers *action* sci-fi — even if both swiped right on the same genre pill.
+- A right-swipe on movie M triggers a fetch for `/movie/M/recommendations` (live mode) or a genre match against the offline corpus
+- Results are filtered for unseen, not-disliked, and released films, then up to 5 are appended to the swipe queue
+- If no results are found, genre constraints loosen and the search retries
+- By completion, ATLASS has enough signal to distinguish *cerebral* sci-fi from *action* sci-fi — even if both swiped right on the same genre pill
 
 ---
 
 ## 💾 State Management & Persistence
 
-ATLASS has no Redux, no Zustand, no reactive store. State is a plain JavaScript object that every module imports and mutates directly. Persistence is handled by a small set of helper functions that serialize state to `localStorage` on every meaningful change — intentionally minimal and surprisingly effective.
-
-```mermaid
-flowchart TD
-    A([User Action\ne.g. Add to Watchlist]) --> B[state.watchlist.push\nMutate shared state object]
-
-    B --> C[saveWatchlistToStorage\nJSON.stringify → localStorage]
-    C --> D[updateWatchlistUI\nRebuild watchlist strip DOM]
-
-    D --> E[updateWLCount\nUpdate nav badge]
-    E --> F[syncWatchlistButtons\nCards · Hero · Modal · Platform]
-
-    F --> G{movieLensData\nloaded?}
-    G -->|Yes| H[initializeRecommender\nRe-run hybrid model\nwith updated ratings]
-    G -->|No| I[Skip model update\nInsufficient data]
-
-    H --> J[New ranked results\nRefresh personalized rows]
-```
+ATLASS has no Redux, no Zustand, no reactive store. State is a plain JavaScript object that every module imports and mutates directly. Persistence is a small set of helper functions that serialize to `localStorage` on every meaningful change. When watchlist or ratings change, `initializeRecommender` re-runs the full hybrid model and refreshes all personalized rows — every interaction feeds back into the ML pipeline immediately.
 
 ### localStorage Schema
 
@@ -433,7 +362,12 @@ flowchart TD
 
 The Roulette of Fate is the most technically adventurous component in ATLASS. It is a WebGL-powered `CircularGallery` — ported and extensively customized from the React Bits OGL component — that renders your watchlist as 3D-curved poster cards on a mathematical arc. When you spin it, the gallery accelerates to a programmatically pre-chosen target index while synthesized sound effects play, then decelerates, snaps, and reveals "Tonight's Pick" with a golden border glow and a confetti burst.
 
+**Initialization:** On mount, watchlist items are mapped to gallery cards via a `weserv.nl` poster proxy. The OGL renderer, camera, and scene are constructed from scratch — `PlaneGeometry` with 100×50 segments per card, one mesh and shader per movie, running in a 60fps `requestAnimationFrame` loop.
+
+**Spin mechanics:** Clicking "Spin It!" picks a random winning movie, computes a target scroll position as `currentIndex + 4×N + offset`, and sets `scroll.target`. Each frame eases toward the target at a factor of `0.04`. Once delta settles below 0.15, `uWinningTarget` activates the gold glow shader and the confetti burst fires 75 particles.
+
 ```mermaid
+%%{init: {'theme': 'dark'}}%%
 flowchart TD
     subgraph INIT [" Gallery Initialization "]
         I1([initPickGallery]) --> I2{Watchlist\nLength?}
@@ -537,6 +471,7 @@ atlass/
 ### Module Dependency Graph
 
 ```mermaid
+%%{init: {'theme': 'dark'}}%%
 flowchart LR
     APP[app.js] --> STATE[state.js]
     APP --> CFG[config.js]
@@ -560,7 +495,7 @@ flowchart LR
 
     style APP fill:#fbbf24,stroke:#d97706,color:#000
     style REC fill:#60a5fa,stroke:#2563eb,color:#000
-    style ML  fill:#a78bfa,stroke:#7c3aed,color:#000
+    style ML  fill:#a78bfa,stroke:#7c3aed,color:#fff
     style UI  fill:#f87171,stroke:#dc2626,color:#000
 ```
 
@@ -576,11 +511,11 @@ flowchart LR
 | Dataset | [MovieLens ml-latest-small](https://grouplens.org/datasets/movielens/) | 9,742 movies · 100,836 ratings · 610 users |
 | Live Data | [TMDb API v3](https://developer.themoviedb.org/docs) | Posters, trailers, cast, streaming providers |
 | Rendering | DOM + WebGL via [OGL](https://github.com/oframe/ogl) | DOM for UI; WebGL for the 3D curved gallery |
-| Language | Vanilla JavaScript (ES Modules) | No build step needed — model inference runs directly in the browser |
+| Language | JavaScript (ES Modules) | Model inference runs directly in the browser — no build step, no server |
 | Fonts | Syne + DM Sans via Google Fonts | Editorial magazine aesthetic |
 | Icons | Font Awesome 6 | Consistent icon system |
 | Animation | CSS keyframes + GSAP + Web Audio API | Pill nav, surprise orb, WebGL spin SFX |
-| State | Single shared `state` object + `localStorage` | No Redux, no reactivity library needed |
+| State | Single shared `state` object + `localStorage` | Every rating change re-triggers the ML pipeline |
 | Build | **None** | ES modules via `<script type="module">` |
 
 ---
