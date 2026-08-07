@@ -487,7 +487,7 @@ flowchart LR
     REC --> UI
     ML --> MJ[(model.json)]
     ML --> CJ[(content_model.json)]
-    REC --> CSV[(ml-latest-small/*.csv)]
+    REC --> CSV[(ml-latest/*.csv)]
 
     UI --> DATA[data.js]
     UI --> CG[CircularGallery.js]
