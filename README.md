@@ -6,7 +6,7 @@
 ### *Adaptive Taste Learning And Suggestion System*
 
 > A cinematic discovery engine that thinks like a machine learning model  
-> and feels like a streaming platform — built in pure vanilla JavaScript with zero frameworks.
+> and feels like a streaming platform. 
 
 
 
