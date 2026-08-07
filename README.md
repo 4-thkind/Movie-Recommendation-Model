@@ -342,6 +342,16 @@ The onboarding deck doesn't stop learning once you start swiping. Every right-sw
 
 ATLASS has no Redux, no Zustand, no reactive store. State is a plain JavaScript object that every module imports and mutates directly. Persistence is a small set of helper functions that serialize to `localStorage` on every meaningful change. When watchlist or ratings change, `initializeRecommender` re-runs the full hybrid model and refreshes all personalized rows — every interaction feeds back into the ML pipeline immediately.
 
+The state object is the single source of truth for the entire app. It holds the current user, watchlist, ratings, onboarding progress, active filters, and UI flags. Any module that needs data reads from it directly; any module that changes data writes to it and calls the appropriate persistence helper. There is no event bus, no pub/sub, no proxy — just direct mutation and explicit re-renders triggered at the call site.
+
+When ratings change, the update path is:
+1. Rating written to `state.ratings` and persisted to `localStorage`
+2. `initializeRecommender()` called — re-runs the full fold-in + hybrid score pass
+3. All 17 personalized rows re-rendered with freshly ranked results
+4. Match badges updated to reflect the new taste vector
+
+This means every star you give a movie immediately reshapes the entire feed. The feedback loop is synchronous and total.
+
 ### localStorage Schema
 
 | Key | Format | Example |
@@ -365,6 +375,8 @@ The Roulette of Fate is the most technically adventurous component in ATLASS. It
 **Initialization:** On mount, watchlist items are mapped to gallery cards via a `weserv.nl` poster proxy. The OGL renderer, camera, and scene are constructed from scratch — `PlaneGeometry` with 100×50 segments per card, one mesh and shader per movie, running in a 60fps `requestAnimationFrame` loop.
 
 **Spin mechanics:** Clicking "Spin It!" picks a random winning movie, computes a target scroll position as `currentIndex + 4×N + offset`, and sets `scroll.target`. Each frame eases toward the target at a factor of `0.04`. Once delta settles below 0.15, `uWinningTarget` activates the gold glow shader and the confetti burst fires 75 particles.
+
+The circular gallery does not use any pre-built carousel library. Every vertex displacement, every easing curve, every shader uniform is written from scratch in `CircularGallery.js`. The component is fully self-contained: it manages its own OGL context, its own animation loop, its own audio synthesis, and its own confetti system. It communicates with the rest of the app only through the shared `state` object — reading the watchlist on init and writing the selected movie on win.
 
 ```mermaid
 %%{init: {'theme': 'dark'}}%%
@@ -510,19 +522,19 @@ flowchart LR
 | ML — Inference | Browser-native JSON weight matrices | The trained model ships as `model.json` + `content_model.json`; inference runs client-side, zero server |
 | Dataset | [MovieLens ml-latest-small](https://grouplens.org/datasets/movielens/) | 9,742 movies · 100,836 ratings · 610 users |
 | Live Data | [TMDb API v3](https://developer.themoviedb.org/docs) | Posters, trailers, cast, streaming providers |
-| Rendering | DOM + WebGL via [OGL](https://github.com/oframe/ogl) | DOM for UI; WebGL for the 3D curved gallery |
-| Language | JavaScript (ES Modules) | Model inference runs directly in the browser — no build step, no server |
+| Rendering | DOM + WebGL via [OGL](https://github.com/oframe/ogl) | DOM for standard UI; WebGL exclusively for the 3D curved gallery |
+| Language | JavaScript (ES Modules) | Model inference runs directly in the browser — no build step, no server, no framework overhead |
 | Fonts | Syne + DM Sans via Google Fonts | Editorial magazine aesthetic |
 | Icons | Font Awesome 6 | Consistent icon system |
 | Animation | CSS keyframes + GSAP + Web Audio API | Pill nav, surprise orb, WebGL spin SFX |
-| State | Single shared `state` object + `localStorage` | Every rating change re-triggers the ML pipeline |
-| Build | **None** | ES modules via `<script type="module">` |
+| State | Single shared `state` object + `localStorage` | Every rating change re-triggers the full ML inference pipeline |
+| Build | **None** | ES modules via `<script type="module">` — open in a browser, it runs |
 
 ---
 
 ## 🚀 Running Locally
 
-No Node.js required. No `npm install`. Just a web server.
+No Node.js required. No `npm install`. No build step. Just a static file server.
 
 ```bash
 # Python 3 (recommended — zero dependencies)
@@ -536,11 +548,13 @@ Then open `http://localhost:8080`.
 
 > **⚠️ Important:** Do **not** open `index.html` via `file://`. CORS policy blocks `fetch()` calls to local CSV files and the TMDb API. Always serve through a local web server.
 
+The app loads in two phases: the UI shell renders immediately from `index.html`, then `app.js` boots the ML pipeline asynchronously. On first load without an API key, it fetches `model.json` (~500 KB) and `content_model.json` (~200 KB) from the `data/` directory — these are the pre-trained weight matrices that power all recommendations. Subsequent loads read ratings from `localStorage` and re-run inference in under 50ms.
+
 ---
 
 ## 🔑 API Key Setup
 
-The bundled key works immediately. To substitute your own for higher rate limits:
+A bundled fallback key is included for immediate use. To substitute your own for higher rate limits:
 
 1. Get a free key at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)
 2. Open the app → click the avatar (top-right) → **Settings** → **API** tab
@@ -549,13 +563,15 @@ The bundled key works immediately. To substitute your own for higher rate limits
 
 ### Offline Fallbacks
 
+When no API key is present, every feature degrades gracefully — the ML model continues to drive all recommendations:
+
 | Feature | Fallback |
 |---|---|
 | Movie metadata | MovieLens CSV data |
 | Posters | Unsplash placeholder images |
-| Match scores | `85 + ((movieId × 7) % 15)` |
-| Recommendations | SVD + Content hybrid model |
-| Trending | Curated MovieLens IDs |
+| Match scores | SVD + Content hybrid model scores |
+| Recommendations | Full SVD + Content inference pipeline |
+| Trending | Curated high-rated MovieLens IDs |
 | Platform Browser | Cached platform data |
 
 ---
@@ -571,6 +587,8 @@ The bundled key works immediately. To substitute your own for higher rate limits
 | `fetch()` | Chrome 42 · Firefox 39 · Safari 10.1 |
 | `IntersectionObserver` | Chrome 58 · Firefox 55 · Safari 15.4 |
 | `ResizeObserver` | Chrome 64 · Firefox 69 · Safari 13.1 |
+
+All features degrade gracefully on older browsers — the ML pipeline and core UI work wherever ES Modules and `fetch()` are supported. WebGL is required only for the Roulette of Fate gallery; the rest of the app renders without it.
 
 ---
 
