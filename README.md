@@ -8,12 +8,7 @@
 > A cinematic discovery engine that thinks like a machine learning model  
 > and feels like a streaming platform — built in pure vanilla JavaScript with zero frameworks.
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-atlass--model.vercel.app-6366f1?style=for-the-badge&logo=vercel)](https://atlass-model.vercel.app)
-[![JavaScript](https://img.shields.io/badge/Vanilla%20JS-ES%20Modules-f7df1e?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules)
-[![TMDb](https://img.shields.io/badge/Powered%20by-TMDb%20API-01b4e4?style=for-the-badge&logo=themoviedatabase&logoColor=white)](https://www.themoviedb.org/)
-[![MovieLens](https://img.shields.io/badge/Dataset-MovieLens%20ml--latest--small-10b981?style=for-the-badge)](https://grouplens.org/datasets/movielens/)
-[![WebGL](https://img.shields.io/badge/Gallery-WebGL%20%2B%20OGL-a855f7?style=for-the-badge)](https://github.com/oframe/ogl)
-[![License](https://img.shields.io/badge/License-Educational-f59e0b?style=for-the-badge)](#license--attributions)
+
 
 <br/>
 
@@ -595,7 +590,7 @@ Built for educational and portfolio purposes.
 
 <div align="center">
 
-Made with obsessive attention to detail by [4-thkind](https://github.com/4-thkind)
+Made with obsessive attention to detail by [Utkarsh Singh](https://github.com/4-thkind) && [Pranav Pant](https://github.com/pranavpant9916-ctrl)
 
 *No frameworks were harmed in the making of this project.*
 
